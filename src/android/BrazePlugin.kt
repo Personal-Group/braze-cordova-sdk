@@ -2,6 +2,7 @@ package com.braze.cordova
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
 import com.braze.Braze
@@ -36,6 +37,7 @@ import java.math.BigDecimal
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
+
 @Suppress("TooManyFunctions", "MaxLineLength", "WildcardImport")
 open class BrazePlugin : CordovaPlugin() {
     private lateinit var applicationContext: Context
@@ -49,6 +51,7 @@ open class BrazePlugin : CordovaPlugin() {
         // Configure Braze using the preferences from the config.xml file passed to our plugin
         configureFromCordovaPreferences(preferences)
 
+        initializeGeofences()
         // Since we've likely passed the first Application.onCreate() (due to the plugin lifecycle), lets call the
         // in-app message manager and session handling now
         BrazeInAppMessageManager.getInstance().registerInAppMessageManager(cordova.activity)
@@ -387,6 +390,19 @@ open class BrazePlugin : CordovaPlugin() {
         }
     }
 
+    override fun onRequestPermissionResult(requestCode: Int, permissions: Array<String?>?, grantResults: IntArray) {
+        when (requestCode) {
+            LOCATION_REQUEST_CODE ->
+                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    brazelog(I) { "Fine location permission granted." }
+                    Braze.getInstance(applicationContext).requestLocationInitialization()
+                } else {
+                    brazelog(I) { "Fine location permission NOT granted." }
+                }
+            else -> {}
+        }
+    }
+
     /**
      * Calls [BrazePlugin.pluginInitialize] if [BrazePlugin.pluginInitializationFinished] is false.
      */
@@ -595,6 +611,28 @@ open class BrazePlugin : CordovaPlugin() {
         return true
     }
 
+    private fun initializeGeofences() {
+        val fineLocationPermission = "android.permission.ACCESS_FINE_LOCATION"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val accessBackgroundPermission = "android.permission.ACCESS_BACKGROUND_LOCATION"
+            // Get location permissions, if we need them
+            if (cordova.hasPermission(fineLocationPermission) && cordova.hasPermission(accessBackgroundPermission)) {
+                Braze.getInstance(applicationContext).requestLocationInitialization()
+            } else {
+                // Request the permission
+                cordova.requestPermissions(this, LOCATION_REQUEST_CODE, arrayOf(fineLocationPermission, accessBackgroundPermission))
+            }
+        } else {
+            // Get location permissions, if we need them
+            if (cordova.hasPermission(fineLocationPermission)) {
+                Braze.getInstance(applicationContext).requestLocationInitialization()
+            } else {
+                // Request the permission
+                cordova.requestPermission(this, LOCATION_REQUEST_CODE, fineLocationPermission)
+            }
+        }
+    }
+
     companion object {
         // Preference keys found in the config.xml
         private const val BRAZE_API_KEY_PREFERENCE = "com.braze.api_key"
@@ -631,6 +669,9 @@ open class BrazePlugin : CordovaPlugin() {
         private const val LOG_CONTENT_CARDS_CLICKED_METHOD = "logContentCardClicked"
         private const val LOG_CONTENT_CARDS_IMPRESSION_METHOD = "logContentCardImpression"
         private const val LOG_CONTENT_CARDS_DISMISSED_METHOD = "logContentCardDismissed"
+
+        // Geofences
+        private const val LOCATION_REQUEST_CODE = 271
 
         private fun getCategoriesFromJSONArray(jsonArray: JSONArray): EnumSet<CardCategory> {
             val categories = EnumSet.noneOf(CardCategory::class.java)
