@@ -56,7 +56,6 @@
     <source-file src="src/ios/BrazePlugin.m" />
     <header-file src="src/ios/AppDelegate+Braze.h" />
     <source-file src="src/ios/AppDelegate+Braze.m" />
-    <header-file src="src/ios/BrazeIDFADelegate.h" />
     <!-- Editing the plist for the location permission prompt -->
     <config-file target="*-Info.plist" parent="NSLocationAlwaysUsageDescription">
       <string>This app is requesting your location to better serve you content.</string>

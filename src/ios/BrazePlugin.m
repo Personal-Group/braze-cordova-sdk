@@ -11,7 +11,6 @@
   @property NSString *disableAutomaticPushRegistration;
   @property NSString *disableAutomaticPushHandling;
   @property NSString *apiEndpoint;
-  @property NSString *enableIDFACollection;
   @property NSString *enableLocationCollection;
   @property NSString *enableGeofences;
   @property NSString *disableUNAuthorizationOptionProvisional;
@@ -26,7 +25,6 @@
   self.disableAutomaticPushRegistration = settings[@"com.braze.ios_disable_automatic_push_registration"];
   self.disableAutomaticPushHandling = settings[@"com.braze.ios_disable_automatic_push_handling"];
   self.apiEndpoint = settings[@"com.braze.ios_api_endpoint"];
-  self.enableIDFACollection = settings[@"com.braze.ios_enable_idfa_automatic_collection"];
   self.enableLocationCollection = settings[@"com.braze.enable_location_collection"];
   self.enableGeofences = settings[@"com.braze.geofences_enabled"];
   self.disableUNAuthorizationOptionProvisional = settings[@"com.braze.ios_disable_un_authorization_option_provisional"];
@@ -56,14 +54,7 @@
   self.braze = [[Braze alloc] initWithConfiguration:configuration];
   self.braze.inAppMessagePresenter = [[BrazeInAppMessageUI alloc] init];
   self.subscriptions = [NSMutableArray array];
-  
-  // Set the IDFA delegate for the plugin
-  if ([self.enableIDFACollection isEqualToString:@"YES"]) {
-    NSLog(@"IDFA collection enabled. Setting values for ad tracking.");
-    [self.braze setIdentifierForAdvertiser:[self.idfaDelegate advertisingIdentifierString]];
-    [self.braze setAdTrackingEnabled:[self.idfaDelegate isAdvertisingTrackingEnabledOrATTAuthorized]];
-  }
-
+	
   if (![self.disableAutomaticPushRegistration isEqualToString:@"YES"]) {
     UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
     // If the delegate hasn't been set yet, set it here in the plugin

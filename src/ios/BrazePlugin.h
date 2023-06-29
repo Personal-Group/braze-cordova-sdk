@@ -1,11 +1,9 @@
 #import <Cordova/CDV.h>
-#import "BrazeIDFADelegate.h"
 @import BrazeKit;
 
 @interface BrazePlugin : CDVPlugin <UIAlertViewDelegate> {}
 
 @property Braze *braze;
-@property id<BrazeIDFADelegate> idfaDelegate;
 @property NSMutableArray<BRZCancellable *> *subscriptions;
 
 /*-------Braze-------*/
