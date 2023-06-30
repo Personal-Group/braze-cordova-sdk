@@ -75,7 +75,7 @@ BrazePlugin.prototype.requestPushPermission = function () {
 *
 * Prompts the user for location permission
 */
-AppboyPlugin.prototype.requestLocationPermission = function (successCallback, errorCallback) {
+BrazePlugin.prototype.requestLocationPermission = function (successCallback, errorCallback) {
 	cordova.exec(successCallback, errorCallback, "AppboyPlugin", "requestLocationPermission", []);
 }
 
@@ -84,7 +84,7 @@ AppboyPlugin.prototype.requestLocationPermission = function (successCallback, er
 *
 * Gets the location permission status as a string the user for location permission
 */
-AppboyPlugin.prototype.getLocationPermissionStatus = function (successCallback, errorCallback) {
+BrazePlugin.prototype.getLocationPermissionStatus = function (successCallback, errorCallback) {
 	cordova.exec(successCallback, errorCallback, "AppboyPlugin", "getLocationPermissionStatus", []);
 }
 
