@@ -71,6 +71,24 @@ BrazePlugin.prototype.requestPushPermission = function () {
 }
 
 /**
+* ** iOS ONLY**
+*
+* Prompts the user for location permission
+*/
+AppboyPlugin.prototype.requestLocationPermission = function (successCallback, errorCallback) {
+	cordova.exec(successCallback, errorCallback, "AppboyPlugin", "requestLocationPermission", []);
+}
+
+/**
+* ** iOS ONLY**
+*
+* Gets the location permission status as a string the user for location permission
+*/
+AppboyPlugin.prototype.getLocationPermissionStatus = function (successCallback, errorCallback) {
+	cordova.exec(successCallback, errorCallback, "AppboyPlugin", "getLocationPermissionStatus", []);
+}
+
+/**
  * Reports that the current user performed a custom named event.
  * @param {string} eventName - The identifier for the event to track. Best practice is to track generic events
  *      useful for segmenting, instead of specific user actions (i.e. track watched_sports_video instead of

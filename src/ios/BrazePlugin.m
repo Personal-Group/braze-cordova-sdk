@@ -5,8 +5,9 @@
 @import BrazeLocation;
 @import BrazeUI;
 @import UserNotifications;
+@import CoreLocation;
 
-@interface BrazePlugin()
+@interface BrazePlugin() <CLLocationManagerDelegate>
   @property NSString *APIKey;
   @property NSString *disableAutomaticPushRegistration;
   @property NSString *disableAutomaticPushHandling;
@@ -15,6 +16,9 @@
   @property NSString *enableGeofences;
   @property NSString *disableUNAuthorizationOptionProvisional;
   @property NSString *sessionTimeout;
+  
+  @property (nonatomic, strong) CLLocationManager *locationManager;
+  @property (nonatomic, strong) CDVInvokedUrlCommand *locationPermissionRequestCommand;
 @end
 
 @implementation BrazePlugin
@@ -120,6 +124,74 @@
 
 - (void)requestImmediateDataFlush:(CDVInvokedUrlCommand *)command {
   [self.braze requestImmediateDataFlush];
+}
+
+- (void)requestLocationPermission:(CDVInvokedUrlCommand *)command {
+    if (!self.locationManager) {
+        self.locationManager = [[CLLocationManager alloc] init];
+        self.locationManager.delegate = self;
+    }
+    self.locationPermissionRequestCommand = command;
+    [self.locationManager requestAlwaysAuthorization];
+}
+
+- (void)locationManager:(CLLocationManager *)manager didChangeAuthorizationStatus:(CLAuthorizationStatus)status {
+    NSString *returnStatus;
+    if (status == kCLAuthorizationStatusDenied) {
+        returnStatus = @"Denied";
+    } else if (status == kCLAuthorizationStatusRestricted) {
+        returnStatus = @"Restricted";
+    } else if (status == kCLAuthorizationStatusAuthorizedAlways) {
+        returnStatus = @"AuthorizedAlways";
+    } else if (status == kCLAuthorizationStatusAuthorizedWhenInUse) {
+        returnStatus = @"AuthorizedWhenInUse";
+    } else if (status == kCLAuthorizationStatusNotDetermined) {
+        return; // This method is called when requesting permission as well as when the permission changes. We don't want to send a Cordova plugin result until the user has made a choice
+    } else {
+        returnStatus = @"Unknown";
+    }
+    
+    if (self.locationPermissionRequestCommand) {
+        [self sendCordovaSuccessPluginResultWithString:returnStatus andCommand:self.locationPermissionRequestCommand];
+        self.locationPermissionRequestCommand = nil;
+    }
+}
+
+- (void)getLocationPermissionStatus:(CDVInvokedUrlCommand *)command {
+    NSString *authStatus;
+    
+    if (![CLLocationManager locationServicesEnabled]) {
+        authStatus = @"LocationServicesDisabled";
+    } else {
+        switch ([CLLocationManager authorizationStatus]) {
+            case kCLAuthorizationStatusNotDetermined: {
+                authStatus = @"NotDetermined";
+                break;
+            }
+            case kCLAuthorizationStatusRestricted: {
+                authStatus = @"Restricted";
+                break;
+            }
+            case kCLAuthorizationStatusDenied: {
+                authStatus = @"Denied";
+                break;
+            }
+            case kCLAuthorizationStatusAuthorizedWhenInUse: {
+                authStatus = @"AuthorizedWhenInUse";
+                break;
+            }
+            case kCLAuthorizationStatusAuthorizedAlways: {
+                authStatus = @"AuthorizedAlways";
+                break;
+            }
+            default: {
+                authStatus = @"Unknown";
+                break;
+            }
+        }
+    }
+    
+    [self sendCordovaSuccessPluginResultWithString:(NSString *)authStatus andCommand:command];
 }
 
 /*-------Braze.User-------*/
