@@ -135,20 +135,26 @@
     [self.locationManager requestAlwaysAuthorization];
 }
 
-- (void)locationManager:(CLLocationManager *)manager didChangeAuthorizationStatus:(CLAuthorizationStatus)status {
+- (void)locationManagerDidChangeAuthorization:(CLLocationManager *)manager {
+	CLAuthorizationStatus status = manager.authorizationStatus;
     NSString *returnStatus;
-    if (status == kCLAuthorizationStatusDenied) {
-        returnStatus = @"Denied";
-    } else if (status == kCLAuthorizationStatusRestricted) {
-        returnStatus = @"Restricted";
-    } else if (status == kCLAuthorizationStatusAuthorizedAlways) {
-        returnStatus = @"AuthorizedAlways";
-    } else if (status == kCLAuthorizationStatusAuthorizedWhenInUse) {
-        returnStatus = @"AuthorizedWhenInUse";
-    } else if (status == kCLAuthorizationStatusNotDetermined) {
-        return; // This method is called when requesting permission as well as when the permission changes. We don't want to send a Cordova plugin result until the user has made a choice
+    
+    if (![CLLocationManager locationServicesEnabled]) {
+        returnStatus = @"LocationServicesDisabled";
     } else {
-        returnStatus = @"Unknown";
+		if (status == kCLAuthorizationStatusDenied) {
+			returnStatus = @"Denied";
+		} else if (status == kCLAuthorizationStatusRestricted) {
+			returnStatus = @"Restricted";
+		} else if (status == kCLAuthorizationStatusAuthorizedAlways) {
+			returnStatus = @"AuthorizedAlways";
+		} else if (status == kCLAuthorizationStatusAuthorizedWhenInUse) {
+			returnStatus = @"AuthorizedWhenInUse";
+		} else if (status == kCLAuthorizationStatusNotDetermined) {
+			return; // This method is called when requesting permission as well as when the permission changes. We don't want to send a Cordova plugin result until the user has made a choice
+		} else {
+			returnStatus = @"Unknown";
+		}
     }
     
     if (self.locationPermissionRequestCommand) {
