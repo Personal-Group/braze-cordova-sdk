@@ -58,6 +58,7 @@ static Braze *_braze;
   [configuration.api setSdkFlavor:BRZSDKFlavorCordova];
   
   // Set location collection and geofences from preferences
+  [configuration.location setBrazeLocationProvider:[[BrazeLocationProvider alloc] init]];
   [configuration.location setGeofencesEnabled:self.enableGeofences];
   [configuration.location setAutomaticLocationCollection:self.enableLocationCollection];
 
