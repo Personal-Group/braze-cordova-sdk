@@ -135,8 +135,7 @@
     [self.locationManager requestAlwaysAuthorization];
 }
 
-- (void)locationManagerDidChangeAuthorization:(CLLocationManager *)manager {
-	CLAuthorizationStatus status = manager.authorizationStatus;
+- (void)locationManager:(CLLocationManager *)manager didChangeAuthorizationStatus:(CLAuthorizationStatus)status {
     NSString *returnStatus;
     
     if (![CLLocationManager locationServicesEnabled]) {
