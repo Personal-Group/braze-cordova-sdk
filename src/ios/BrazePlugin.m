@@ -200,6 +200,25 @@
     [self sendCordovaSuccessPluginResultWithString:(NSString *)authStatus andCommand:command];
 }
 
+- (void)getMonitoredGeofences:(CDVInvokedUrlCommand *)command {
+    NSMutableArray *regionDescriptions = [[NSMutableArray alloc] init];
+    NSSet *monitoredRegions = self.locationManager.monitoredRegions;
+    [regionDescriptions addObject:[NSString stringWithFormat: @"Monitoring %lu geofences", (unsigned long)monitoredRegions.count]];
+		
+    for (CLRegion *region in monitoredRegions) {
+        if ([region isKindOfClass:[CLCircularRegion class]]) {
+            CLCircularRegion *circularRegion = (CLCircularRegion *)region;
+            NSString *desc = [NSString stringWithFormat:@"%@: lat=%f, long=%f, r=%f", circularRegion.identifier, circularRegion.center.latitude, circularRegion.center.longitude, circularRegion.radius];
+            [regionDescriptions addObject:desc];
+        } else {
+            NSString *desc = [NSString stringWithFormat:@"%@: not circular", region.identifier];
+            [regionDescriptions addObject:desc];
+    	}	
+    }
+        
+	[self sendCordovaSuccessPluginResultWithArray:regionDescriptions andCommand:command];
+}
+
 /*-------Braze.User-------*/
 - (void)setFirstName:(CDVInvokedUrlCommand *)command {
   NSString *firstName = [command argumentAtIndex:0 withDefault:nil];

@@ -83,7 +83,7 @@ BrazePlugin.prototype.requestLocationInitialization = function (forceInitializat
 /**
 * ** iOS ONLY**
 *
-* Prompts the user for location permission
+* Prompts the user for location permission.
 */
 BrazePlugin.prototype.requestLocationPermission = function (successCallback, errorCallback) {
 	cordova.exec(successCallback, errorCallback, "BrazePlugin", "requestLocationPermission", []);
@@ -96,6 +96,15 @@ BrazePlugin.prototype.requestLocationPermission = function (successCallback, err
 */
 BrazePlugin.prototype.getLocationPermissionStatus = function (successCallback, errorCallback) {
 	cordova.exec(successCallback, errorCallback, "BrazePlugin", "getLocationPermissionStatus", []);
+}
+
+/**
+* ** iOS ONLY**
+*
+* Gets a list of geofences currently being monitored for events
+*/
+BrazePlugin.prototype.getMonitoredGeofences = function (successCallback, errorCallback) {
+	cordova.exec(successCallback, errorCallback, "BrazePlugin", "getMonitoredGeofences", []);
 }
 
 /**

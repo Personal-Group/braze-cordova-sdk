@@ -16,6 +16,11 @@
 - (void)requestImmediateDataFlush:(CDVInvokedUrlCommand *)command;
 - (void)getDeviceId:(CDVInvokedUrlCommand *)command;
 
+/*-------Location-------*/
+- (void)requestLocationPermission:(CDVInvokedUrlCommand *)command;
+- (void)getLocationPermissionStatus:(CDVInvokedUrlCommand *)command;
+- (void)getMonitoredGeofences:(CDVInvokedUrlCommand *)command;
+
 /*-------Braze.User-------*/
 - (void)setFirstName:(CDVInvokedUrlCommand *)command;
 - (void)setLastName:(CDVInvokedUrlCommand *)command;
