@@ -39,6 +39,9 @@
   if (![self.disableAutomaticPushHandling isEqualToString:@"YES"]) {
     [AppDelegate swizzleHostAppDelegate];
   }
+  
+  self.locationManager = [[CLLocationManager alloc] init];
+  self.locationManager.delegate = self;
 }
 
 - (void)didFinishLaunchingListener:(NSNotification *)notification {
@@ -50,7 +53,8 @@
   [configuration.location setBrazeLocationProvider:[[BrazeLocationProvider alloc] init]];
   [configuration.location setGeofencesEnabled:self.enableGeofences];
   [configuration.location setAutomaticLocationCollection:self.enableLocationCollection];
-
+  [configuration.location setAutomaticGeofenceRequests:self.enableGeofences];
+  
   // Set the time interval for session time out (in seconds)
   NSNumber *timeout = [[[NSNumberFormatter alloc] init] numberFromString:self.sessionTimeout];
   [configuration setSessionTimeout:[timeout doubleValue]];
