@@ -145,6 +145,17 @@ open class BrazePlugin : CordovaPlugin() {
                 cordova.activity.requestPushPermissionPrompt()
                 return true
             }
+            "requestLocationInitialization" -> {
+	            if (args[0].toString().toBoolean()) {
+			        brazelog(D) { "Calling requestLocationInitialization()" }
+		            Braze.getInstance(applicationContext).requestLocationInitialization()
+	            } else {
+			        brazelog(D) { "Calling initializeGeofences()" }
+            		initializeGeofences()
+            	}
+				
+            	return true
+            }
             "setUserAttributionData" -> {
                 runOnUser {
                     it.setAttributionData(

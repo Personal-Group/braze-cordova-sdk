@@ -71,6 +71,16 @@ BrazePlugin.prototype.requestPushPermission = function () {
 }
 
 /**
+* ** ANDROID ONLY**
+*
+* Requests the Braze location initialisation starts. This should happen when permission 
+* is granted, but this gives us control if location permission is requested elsewhere
+*/
+BrazePlugin.prototype.requestLocationInitialization = function (forceInitialization) {
+	cordova.exec(null, null, "BrazePlugin", "requestLocationInitialization", [forceInitialization]);
+}
+
+/**
 * ** iOS ONLY**
 *
 * Prompts the user for location permission
