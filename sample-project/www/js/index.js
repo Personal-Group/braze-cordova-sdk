@@ -39,15 +39,19 @@ var app = {
         document.getElementById("refreshFeatureFlagsBtn").addEventListener("click", refreshFeatureFlags);
         document.getElementById("subscribeToFeatureFlagsBtn").addEventListener("click", subscribeToFeatureFlags);
         document.getElementById("getFeatureFlagPropertyBtn").addEventListener("click", getFeatureFlagProperty);
+        document.getElementById("logFeatureFlagImpressionBtn").addEventListener("click", logFeatureFlagImpression);
         document.getElementById("changeUserBtn").addEventListener("click", changeUser);
+        document.getElementById("setSdkAuthBtn").addEventListener("click", setSdkAuthenticationSignature);
         document.getElementById("logCustomEventBtn").addEventListener("click", logCustomEvent);
         document.getElementById("logPurchaseBtn").addEventListener("click", logPurchase);
         document.getElementById("setCustomUserAttributeBtn").addEventListener("click", setCustomUserAttribute);
+        document.getElementById("mergeCustomUserAttributeBtn").addEventListener("click", mergeCustomUserAttribute);
         document.getElementById("setUserPropertiesBtn").addEventListener("click", setUserProperties);
         document.getElementById("launchNewsFeedBtn").addEventListener("click", launchNewsFeed);
         document.getElementById("launchContentCardsBtn").addEventListener("click", launchContentCards);
         document.getElementById("unsetCustomUserAttributeBtn").addEventListener("click", unsetCustomUserAttribute);
         document.getElementById("setCustomUserAttributeArrayBtn").addEventListener("click", setCustomUserAttributeArray);
+        document.getElementById("setCustomUserAttributeObjectArrayBtn").addEventListener("click", setCustomUserAttributeObjectsArray);
         document.getElementById("incrementCustomUserAttributeBtn").addEventListener("click", incrementCustomUserAttribute);
         document.getElementById("addToCustomUserAttributeArrayBtn").addEventListener("click", addToCustomUserAttributeArray);
         document.getElementById("removeFromCustomUserAttributeArrayBtn").addEventListener("click", removeFromCustomUserAttributeArray);
@@ -67,14 +71,7 @@ var app = {
         document.getElementById("setLanguageBtn").addEventListener("click", setLanguage);
         document.getElementById("getDeviceId").addEventListener("click", getDeviceId);
         document.getElementById("requestPushPermission").addEventListener("click", requestPushPermission);
-
-        var success = function(message) {
-            alert(message);
-        }
-
-        var failure = function() {
-            alert("Error calling Hello Plugin");
-        }
+        BrazePlugin.subscribeToSdkAuthenticationFailures(customPluginSuccessCallback(), customPluginErrorCallback);
     },
         // Update DOM on a Received Event
     receivedEvent: function(id) {
@@ -94,8 +91,27 @@ app.initialize();
 // Braze methods
 function changeUser() {
     const userId = document.getElementById("changeUserInputId").value;
-    BrazePlugin.changeUser(userId);
-    showTextBubble(`User changed to ${userId}`);
+    const sdkAuthSignature = document.getElementById("sdkAuthSignature").value;
+    if (!userId) {
+        showTextBubble("User ID not entered.");
+        return;
+    }
+    if (!sdkAuthSignature) {
+        BrazePlugin.changeUser(userId);
+    } else {
+        BrazePlugin.changeUser(userId, sdkAuthSignature);
+    }
+    showTextBubble(`User changed to ${userId} with auth signature ${sdkAuthSignature}`);
+}
+
+function setSdkAuthenticationSignature() {
+    const sdkAuthSignature = document.getElementById("sdkAuthSignature").value;
+    if (!sdkAuthSignature) {
+        showTextBubble("SDK auth signature not entered.");
+        return;
+    }
+    BrazePlugin.setSdkAuthenticationSignature(sdkAuthSignature);
+    showTextBubble(`SDK authentication signature set to ${sdkAuthSignature}`);
 }
 
 async function getFeatureFlag() {
@@ -151,6 +167,16 @@ async function getFeatureFlagProperty() {
         default:
             showTextBubble("No property type selected.");
     }
+}
+
+function logFeatureFlagImpression() {
+    const featureFlagId = document.getElementById("featureFlagInputId").value;
+    if (!featureFlagId) {
+        showTextBubble("Feature Flag ID not entered.");
+        return;
+    }
+    BrazePlugin.logFeatureFlagImpression(featureFlagId);
+    showTextBubble(`Impression logged for FF ${featureFlagId}`);
 }
 
 function logCustomEvent() {
@@ -218,12 +244,53 @@ function logPurchase() {
 function setCustomUserAttribute() {
     BrazePlugin.setCustomUserAttribute("cordovaCustomAttributeKey", "cordovaCustomAttributeValue");
     BrazePlugin.incrementCustomUserAttribute("cordovaIncrementCustomAttributeKey", 1);
+
+    BrazePlugin.setCustomUserAttribute("CordovaNCA", {
+        "array key": [1, "two", false],
+        "object key": {
+            "k1": "one",
+            "k2": 2,
+            "k3": false,
+        },
+        "deep key": {
+            "key": [1, "two", true]
+        }
+    });
+
     showTextBubble("Set Custom User Attribute");
+}
+
+function mergeCustomUserAttribute() {
+    BrazePlugin.setCustomUserAttribute("CordovaNCA", 
+    {
+        "mergedInt": 1,
+        "object key": {
+            "mergek1": "1",
+            "mergek2": 2,
+            "mergek3": false,
+        }
+    },
+    true);
+    showTextBubble("Merge Custom User Attribute");
 }
 
 function setCustomUserAttributeArray() {
     BrazePlugin.setCustomUserAttribute("cordovaAttributeArrayButton", ["a", "b"]);
-    showTextBubble("Set Custom User Attribute Array");
+    showTextBubble("Set Custom User Attribute Strings Array");
+}
+
+function setCustomUserAttributeObjectsArray() {
+    BrazePlugin.setCustomUserAttribute("cordovaAttributeArrayButton", [
+        { 
+          "location": "East Rutherford, New Jersey",
+          "nickname": "Giants"
+        },
+        { 
+          "location": "Arlington, Texas",
+          "nickname": "Cowboys"
+        }  
+    ]);
+    showTextBubble("Set Custom User Attribute Objects Array");
 }
 
 function incrementCustomUserAttribute() {
@@ -382,7 +449,13 @@ function showTextBubble(bubbleMessage) {
 * Serves as the success callback for the Braze Plugin. Displays a text bubble with a message when called.
 **/
 function customPluginSuccessCallback(bubbleMessage) {
-    return function(callbackResult) { showTextBubble(bubbleMessage + " " + callbackResult) };
+    return function(callbackResult) { 
+        if (typeof callbackResult === 'object') {
+            console.log(JSON.stringify(callbackResult));
+        } else {
+            showTextBubble(bubbleMessage + " " + callbackResult);
+        }
+    };
 }
 
 /**
@@ -397,6 +470,7 @@ function customPluginSuccessJsonCallback(bubbleMessage) {
 **/
 function customPluginSuccessArrayCallback(bubbleMessage) {
     return function(callbackResult) {
+        console.log(callbackResult);
         var numElements = callbackResult.length;
         showTextBubble("Logging all " + numElements + " objects")
         for (var i = 0; i < numElements; i++) {

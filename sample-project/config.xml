@@ -25,7 +25,7 @@
         <allow-intent href="market:*" />
         <preference name="GradlePluginKotlinEnabled" value="true" />
         <preference name="GradlePluginKotlinCodeStyle" value="official" />
-        <preference name="GradlePluginKotlinVersion" value="1.5.21" />
+        <preference name="GradlePluginKotlinVersion" value="1.7.0" />
         <preference name="android-targetSdkVersion" value="33" />
         <preference name="android-compileSdkVersion" value="33" />
         <preference name="GradleVersion" value="7.3.3" />
@@ -39,6 +39,7 @@
         <preference name="com.braze.android_log_level" value="0" />
         <preference name="com.braze.enable_location_collection" value="true" />
         <preference name="com.braze.geofences_enabled" value="true" />
+        <preference name="com.braze.sdk_authentication_enabled" value="true" />
 
         <edit-config
             file="app/src/main/AndroidManifest.xml"
@@ -56,6 +57,7 @@
         <preference name="com.braze.ios_enable_idfa_automatic_collection" value="YES" />
         <preference name="com.braze.enable_location_collection" value="YES" />
         <preference name="com.braze.geofences_enabled" value="YES" />
+        <preference name="com.braze.sdk_authentication_enabled" value="YES" />
         <preference name="com.braze.display_foreground_push_notifications" value="YES" />
         <preference name="deployment-target" value="11.0" />
         <preference name="com.braze.ios_disable_un_authorization_option_provisional" value="NO" />

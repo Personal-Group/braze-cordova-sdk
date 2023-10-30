@@ -34,9 +34,10 @@ var BrazePlugin = function () {
  *    to target while logged out and switching back to that user ID as part of your app's logout process.
  *
  * @param {string} userId - A unique identifier for this user.
+ * @param {string} sdkAuthenticationToken - A JWT token used for SDK Authentication.
  */
-BrazePlugin.prototype.changeUser = function (userId) {
-	cordova.exec(null, null, "BrazePlugin", "changeUser", [userId]);
+BrazePlugin.prototype.changeUser = function (userId, sdkAuthenticationToken) {
+	cordova.exec(null, null, "BrazePlugin", "changeUser", [userId, sdkAuthenticationToken]);
 }
 
 /**
@@ -165,12 +166,20 @@ BrazePlugin.prototype.setUserAttributionData = function (network, campaign, adgr
  *    255 characters in length, cannot begin with a $, and can only contain alphanumeric characters and punctuation.
  *    Passing a null value will remove this custom attribute from the user.
  */
-BrazePlugin.prototype.setCustomUserAttribute = function (key, value) {
+BrazePlugin.prototype.setCustomUserAttribute = function (key, value, merge = false) {
 	var valueType = typeof(value);
 	if (value instanceof Date) {
   		cordova.exec(null, null, "BrazePlugin", "setDateCustomUserAttribute", [key, Math.floor(value.getTime() / 1000)]);
   	} else if (value instanceof Array) {
-  		cordova.exec(null, null, "BrazePlugin", "setCustomUserAttributeArray", [key, value]);
+		if (value.every(item => typeof(item) === "string")) {
+			cordova.exec(null, null, "BrazePlugin", "setCustomUserAttributeArray", [key, value]);
+		} else if (value.every(item => item instanceof Object)) {
+			cordova.exec(null, null, "BrazePlugin", "setCustomUserAttributeObjectArray", [key, value]);
+		} else {
+			console.log(`User attribute ${value} was not a valid array. Custom attribute arrays can only contain all strings or all objects.`);
+		}
+	} else if (value instanceof Object) {
+		cordova.exec(null, null, "BrazePlugin", "setCustomUserAttributeObject", [key, value, merge]);
   	} else if (valueType === "boolean") {
   		cordova.exec(null, null, "BrazePlugin", "setBoolCustomUserAttribute", [key, value]);
   	} else if (valueType === "string") {
@@ -181,7 +190,7 @@ BrazePlugin.prototype.setCustomUserAttribute = function (key, value) {
   		} else {
   			cordova.exec(null, null, "BrazePlugin", "setDoubleCustomUserAttribute", [key, value]);
   		}
-  	}
+ 	}
 }
 
 /**
@@ -575,6 +584,16 @@ BrazePlugin.prototype.getFeatureFlagNumberProperty = function(flagId, propertyKe
 }
 
 /**
+ * Log a Feature Flag impression.
+ * An impression will only be logged if the feature flag is part of a Braze campaign.
+ * A feature flag impression can only be logged once per session for a given ID.
+ * @param {string} flagId - The identifier for the Feature Flag.
+ */
+BrazePlugin.prototype.logFeatureFlagImpression = function(flagId) {
+	cordova.exec(null, null, "BrazePlugin", "logFeatureFlagImpression", [flagId]);
+}
+
+/**
  * @return Starts SDK session tracking if previously disabled. Only used for Android.
  */
 BrazePlugin.prototype.startSessionTracking = function () {
@@ -610,6 +629,29 @@ BrazePlugin.prototype['ContentCardTypes'] = {
 	'BANNER': 'Banner',
 	'CAPTIONED': 'Captioned'
 };
+
+/**
+ * Sets the signature used for SDK authentication
+ * for the currently identified user.
+ *
+ * @param {string} jwtToken - SDK Authentication JWT token.
+ */
+BrazePlugin.prototype.setSdkAuthenticationSignature = function (jwtToken) {
+	cordova.exec(null, null, "BrazePlugin", "setSdkAuthenticationSignature", [jwtToken]);
+}
+
+/**
+* Subscribes to SDK Authentication failures.
+*
+* Reports failures in the following JSON format:
+* 	(string) "signature"
+* 	(number) "errorCode"
+* 	(string) "errorReason"
+* 	(string) "userId"
+*/
+BrazePlugin.prototype.subscribeToSdkAuthenticationFailures = function (successCallback, errorCallback) {
+	cordova.exec(successCallback, errorCallback, "BrazePlugin", "subscribeToSdkAuthenticationFailures");
+}
 
 var AppboyPlugin = BrazePlugin;
 

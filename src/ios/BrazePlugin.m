@@ -8,6 +8,8 @@
 @import CoreLocation;
 
 @interface BrazePlugin() <CLLocationManagerDelegate>
+@interface BrazePlugin() <BrazeSDKAuthDelegate>
+
   @property NSString *APIKey;
   @property NSString *disableAutomaticPushRegistration;
   @property NSString *disableAutomaticPushHandling;
@@ -16,12 +18,23 @@
   @property NSString *enableGeofences;
   @property NSString *disableUNAuthorizationOptionProvisional;
   @property NSString *sessionTimeout;
-  
+  @property NSString *enableSDKAuth;
+  @property NSString *sdkAuthCallbackID;
   @property (nonatomic, strong) CLLocationManager *locationManager;
   @property (nonatomic, strong) CDVInvokedUrlCommand *locationPermissionRequestCommand;
 @end
 
+static Braze *_braze;
+
 @implementation BrazePlugin
+
++ (Braze *)braze {
+  return _braze;
+}
+
++ (void)setBraze:(Braze *)braze {
+  _braze = braze;
+}
 
 - (void)pluginInitialize {
   NSDictionary *settings = self.commandDelegate.settings;
@@ -33,6 +46,7 @@
   self.enableGeofences = settings[@"com.braze.geofences_enabled"];
   self.disableUNAuthorizationOptionProvisional = settings[@"com.braze.ios_disable_un_authorization_option_provisional"];
   self.sessionTimeout = settings[@"com.braze.ios_session_timeout"];
+  self.enableSDKAuth = settings[@"com.braze.sdk_authentication_enabled"];
 
   [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didFinishLaunchingListener:) name:UIApplicationDidFinishLaunchingNotification object:nil];
 
@@ -62,7 +76,15 @@
   self.braze = [[Braze alloc] initWithConfiguration:configuration];
   self.braze.inAppMessagePresenter = [[BrazeInAppMessageUI alloc] init];
   self.subscriptions = [NSMutableArray array];
-	
+
+  [BrazePlugin setBraze:self.braze];
+
+  // Set the SDK authentication delegate
+  if ([self.enableSDKAuth isEqualToString:@"YES"]) {
+    NSLog(@"SDK authentication enabled. To receive and handle authentication errors, call `subscribeToSdkAuthenticationFailures`.");
+    self.braze.sdkAuthDelegate = self;
+  }
+
   if (![self.disableAutomaticPushRegistration isEqualToString:@"YES"]) {
     UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
     // If the delegate hasn't been set yet, set it here in the plugin
@@ -88,10 +110,26 @@
   }
 }
 
-/*-------Braze-------*/
+// MARK: - Braze
 - (void)changeUser:(CDVInvokedUrlCommand *)command {
   NSString *userId = [command argumentAtIndex:0 withDefault:nil];
-  [self.braze changeUser:userId];
+  NSString *sdkAuthSignature = [command argumentAtIndex:1 withDefault:nil];
+  if (userId && sdkAuthSignature) {
+    [self.braze changeUser:userId sdkAuthSignature:sdkAuthSignature];
+  } else if (userId) {
+    [self.braze changeUser:userId];
+  }
+}
+
+- (void)setSdkAuthenticationSignature:(CDVInvokedUrlCommand *)command {
+  NSString *sdkAuthSignature = [command argumentAtIndex:0 withDefault:nil];
+  if (sdkAuthSignature) {
+    [self.braze setSDKAuthenticationSignature:sdkAuthSignature];
+  }
+}
+
+- (void)subscribeToSdkAuthenticationFailures:(CDVInvokedUrlCommand *)command {
+  self.sdkAuthCallbackID = command.callbackId;
 }
 
 - (void)logCustomEvent:(CDVInvokedUrlCommand *)command {
@@ -223,6 +261,7 @@
 }
 
 /*-------Braze.User-------*/
+// MARK: - Braze.User
 - (void)setFirstName:(CDVInvokedUrlCommand *)command {
   NSString *firstName = [command argumentAtIndex:0 withDefault:nil];
   [self.braze.user setFirstName:firstName];
@@ -360,7 +399,47 @@
   NSString *key = [command argumentAtIndex:0 withDefault:nil];
   id value = [command argumentAtIndex:1 withDefault:nil];
   if (key != nil && value != nil && [value isKindOfClass:[NSArray class]]) {
+    for (id item in value) {
+      if (![item isKindOfClass:[NSString class]]) {
+        NSLog(@"Custom attribute array contains element that is not of type string. Aborting.");
+        return;
+      }
+    }
     [self.braze.user setCustomAttributeArrayWithKey:key array:value];
+  }
+}
+
+- (void)setCustomUserAttributeObjectArray:(CDVInvokedUrlCommand *)command {
+  NSString *key = [command argumentAtIndex:0 withDefault:nil];
+  id value = [command argumentAtIndex:1 withDefault:nil];
+  if (key != nil && value != nil && [value isKindOfClass:[NSArray class]]) {
+    for (id item in value) {
+      if (![item isKindOfClass:[NSDictionary class]]) {
+        NSLog(@"Custom attribute array contains element that is not of type object. Aborting.");
+        return;
+      }
+    }
+    [self.braze.user setNestedCustomAttributeArrayWithKey:key value:value];
+  }
+}
+
+- (void)setCustomUserAttributeObject:(CDVInvokedUrlCommand *)command {
+  NSString *key = [command argumentAtIndex:0 withDefault:nil];
+  id value = [command argumentAtIndex:1 withDefault:nil];
+  id merge = [command argumentAtIndex:2 withDefault:nil];
+
+  if (key == nil || value == nil || ![value isKindOfClass:[NSDictionary class]]) {
+    return;
+  }
+
+  if (!merge) {
+    [self.braze.user setNestedCustomAttributeDictionaryWithKey:key value:value];
+  } else if ([merge isKindOfClass:[NSNumber class]]) {
+    BOOL mergeAsBool = [merge boolValue];
+    [self.braze.user setNestedCustomAttributeDictionaryWithKey:key value:value merge:mergeAsBool];
+  } else {
+    NSLog(@"Invalid value received for `merge` parameter. Aborting.");
+    return;
   }
 }
 
@@ -383,7 +462,7 @@
   NSString *key = [command argumentAtIndex:0 withDefault:nil];
   NSString *value = [command argumentAtIndex:1 withDefault:nil];
   if (key != nil && value != nil) {
-    [self.braze.user addToCustomAttributeArrayWithKey:key value:value];
+    [self.braze.user addToCustomAttributeStringArrayWithKey:key value:value];
   }
 }
 
@@ -391,7 +470,7 @@
   NSString *key = [command argumentAtIndex:0 withDefault:nil];
   NSString *value = [command argumentAtIndex:1 withDefault:nil];
   if (key != nil && value != nil) {
-    [self.braze.user removeFromCustomAttributeArrayWithKey:key value:value];
+    [self.braze.user removeFromCustomAttributeStringArrayWithKey:key value:value];
   }
 }
 
@@ -425,12 +504,11 @@
 }
 
 - (void)getDeviceId:(CDVInvokedUrlCommand *)command {
-  [self.braze deviceIdWithCompletion:^(NSString *deviceId) {
-    [self sendCordovaSuccessPluginResultWithString:deviceId andCommand:command];
-  }];
+  NSString *deviceId = self.braze.deviceId;
+  [self sendCordovaErrorPluginResultWithString:deviceId andCommand:command];
 }
 
-/*-------BrazeUI-------*/
+// MARK: - BrazeUI
 - (void)launchNewsFeed:(CDVInvokedUrlCommand *)command {
   NSLog(@"News Feed UI not supported on iOS.");
 }
@@ -444,7 +522,7 @@
   [mainViewController presentViewController:contentCardsModal animated:YES completion:nil];
 }
 
-/*-------News Feed-------*/
+// MARK: - News Feed
 - (void)getNewsFeed:(CDVInvokedUrlCommand *)command {
   [self.braze.newsFeed requestRefresh];
   NSArray *cardCategories = [self getCardCategoriesFromStringArray:command.arguments];
@@ -561,7 +639,7 @@
   return categoryMask;
 }
 
-/*-------Content Cards-------*/
+// MARK: - Content Cards
 - (void)requestContentCardsRefresh:(CDVInvokedUrlCommand *)command {
   [self.braze.contentCards requestRefresh];
 }
@@ -684,7 +762,7 @@
   }
 }
 
-/*-------Feature Flags-------*/
+// MARK: - Feature Flags
 - (void)getFeatureFlag:(CDVInvokedUrlCommand *)command {
   NSString *featureFlagId = [command argumentAtIndex:0 withDefault:nil];
   BRZFeatureFlag *featureFlag = [self.braze.featureFlags featureFlagWithId:featureFlagId];
@@ -757,6 +835,15 @@
   }
 }
 
+- (void)logFeatureFlagImpression:(CDVInvokedUrlCommand *)command {
+  NSString *featureFlagId = [command argumentAtIndex:0 withDefault:nil];
+  if (featureFlagId) {
+    [self.braze.featureFlags logFeatureFlagImpressionWithId:featureFlagId];
+  } else {
+    NSLog(@"No valid feature flag ID entered.");
+  }
+}
+
 + (NSArray<NSDictionary *> *)formattedFeatureFlagsMap:(NSArray<BRZFeatureFlag *> *)featureFlags {
   NSMutableArray<NSDictionary *> *mappedFlags = [NSMutableArray array];
   for (BRZFeatureFlag *flag in featureFlags) {
@@ -774,7 +861,23 @@
   return mappedFlags;
 }
 
-/*-------Cordova Helper Methods-------*/
+
+// MARK: - BrazeSDKAuthDelegate
+- (void)braze:(Braze * _Nonnull)braze sdkAuthenticationFailedWithError:(BRZSDKAuthenticationError * _Nonnull)error {
+  if (self.sdkAuthCallbackID) {
+    NSMutableDictionary *sdkAuthErrorEvent = [[NSMutableDictionary alloc] init];
+    sdkAuthErrorEvent[@"signature"] = error.signature;
+    sdkAuthErrorEvent[@"errorCode"] = @(error.code);
+    sdkAuthErrorEvent[@"errorReason"] = error.reason;
+    sdkAuthErrorEvent[@"userId"] = error.userId;
+    CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
+                                                  messageAsDictionary:sdkAuthErrorEvent];
+    [pluginResult setKeepCallbackAsBool:YES];
+    [self.commandDelegate sendPluginResult:pluginResult callbackId:self.sdkAuthCallbackID];
+  }
+}
+
+// MARK: - Cordova Helper Methods
 - (void)sendCordovaErrorPluginResultWithString:(NSString *)resultMessage andCommand:(CDVInvokedUrlCommand *)command {
   CDVPluginResult *pluginResult = nil;
   pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:resultMessage];

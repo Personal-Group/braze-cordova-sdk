@@ -80,7 +80,10 @@ open class BrazePlugin : CordovaPlugin() {
                 return true
             }
             "changeUser" -> {
-                runOnBraze { it.changeUser(args.getString(0)) }
+                val userId = args.getString(0)
+                // Pass along the SDK Auth token if provided
+                val sdkAuthToken = args.optString(1)
+                runOnBraze { it.changeUser(userId, sdkAuthToken) }
                 return true
             }
             "logCustomEvent" -> {
@@ -200,6 +203,16 @@ open class BrazePlugin : CordovaPlugin() {
             "setCustomUserAttributeArray" -> {
                 val attributes = parseJSONArrayToStringArray(args.getJSONArray(1))
                 runOnUser { it.setCustomAttributeArray(args.getString(0), attributes) }
+                return true
+            }
+            "setCustomUserAttributeObjectArray" -> {
+                val attributes = parseJSONArraytoJsonObjectArray(args.getJSONArray(1))
+                runOnUser { it.setCustomAttribute(args.getString(0), attributes) }
+                return true
+            }
+            "setCustomUserAttributeObject" -> {
+                val attributes = args.getJSONObject(1)
+                runOnUser { it.setCustomAttribute(args.getString(0), attributes, args.getBoolean(2)) }
                 return true
             }
             "addToCustomAttributeArray" -> {
@@ -358,6 +371,29 @@ open class BrazePlugin : CordovaPlugin() {
                 }
                 return true
             }
+            "logFeatureFlagImpression" -> {
+                runOnBraze {
+                    Braze.getInstance(applicationContext).logFeatureFlagImpression(args.getString(0))
+                }
+                return true
+            }
+            "subscribeToSdkAuthenticationFailures" -> {
+                runOnBraze {
+                    it.subscribeToSdkAuthenticationFailures { sdkAuthErrorEvent ->
+                        val jsonResult = JSONObject().apply {
+                            put("signature", sdkAuthErrorEvent.signature)
+                            put("errorCode", sdkAuthErrorEvent.errorCode)
+                            put("errorReason", sdkAuthErrorEvent.errorReason)
+                            put("userId", sdkAuthErrorEvent.userId)
+                            put("requestInitiationTime", sdkAuthErrorEvent.requestInitiationTime)
+                        }
+                        val result = PluginResult(PluginResult.Status.OK, jsonResult)
+                        result.keepCallback = true
+                        callbackContext.sendPluginResult(result)
+                    }
+                }
+                return true
+            }
             GET_NEWS_FEED_METHOD,
             GET_CARD_COUNT_FOR_CATEGORIES_METHOD,
             GET_UNREAD_CARD_COUNT_FOR_CATEGORIES_METHOD -> return handleNewsFeedGetters(action, args, callbackContext)
@@ -491,6 +527,9 @@ open class BrazePlugin : CordovaPlugin() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P && enableRequestFocusFix) {
             // Addresses Cordova bug in https://issuetracker.google.com/issues/36915710
             BrazeInAppMessageManager.getInstance().setCustomInAppMessageViewWrapperFactory(CordovaInAppMessageViewWrapperFactory())
+        }
+        if (cordovaPreferences.contains(SDK_AUTH_ENABLED_PREFERENCE)) {
+            configBuilder.setIsSdkAuthenticationEnabled(cordovaPreferences.getBoolean(SDK_AUTH_ENABLED_PREFERENCE, false))
         }
         Braze.configure(applicationContext, configBuilder.build())
     }
@@ -659,6 +698,7 @@ open class BrazePlugin : CordovaPlugin() {
         private const val ENABLE_LOCATION_PREFERENCE = "com.braze.enable_location_collection"
         private const val ENABLE_GEOFENCES_PREFERENCE = "com.braze.geofences_enabled"
         private const val DISABLE_AUTO_START_SESSIONS_PREFERENCE = "com.braze.android_disable_auto_session_tracking"
+        private const val SDK_AUTH_ENABLED_PREFERENCE = "com.braze.sdk_authentication_enabled"
 
         /**
          * When applied, restricts the SDK from taking
@@ -708,6 +748,19 @@ open class BrazePlugin : CordovaPlugin() {
             val array = arrayOfNulls<String>(length)
             for (i in 0 until length) {
                 array[i] = jsonArray.getString(i)
+            }
+            return array
+        }
+
+        /**
+         * This takes the JSONArray of Any and creates a JSONArray of
+         * explicitly typed JSONObject
+         */
+        private fun parseJSONArraytoJsonObjectArray(jsonArray: JSONArray): JSONArray {
+            val length = jsonArray.length()
+            val array = JSONArray()
+            for (i in 0 until length) {
+                array.put(jsonArray.getJSONObject(i))
             }
             return array
         }
