@@ -7,9 +7,7 @@
 @import UserNotifications;
 @import CoreLocation;
 
-@interface BrazePlugin() <CLLocationManagerDelegate>
-@interface BrazePlugin() <BrazeSDKAuthDelegate>
-
+@interface BrazePlugin() <BrazeSDKAuthDelegate, CLLocationManagerDelegate>
   @property NSString *APIKey;
   @property NSString *disableAutomaticPushRegistration;
   @property NSString *disableAutomaticPushHandling;
