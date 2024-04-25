@@ -38,6 +38,7 @@
 - (void)setHomeCity:(CDVInvokedUrlCommand *)command;
 - (void)setPhoneNumber:(CDVInvokedUrlCommand *)command;
 - (void)setLanguage:(CDVInvokedUrlCommand *)command;
+- (void)setLastKnownLocation:(CDVInvokedUrlCommand *)command;
 
 - (void)setPushNotificationSubscriptionType:(CDVInvokedUrlCommand *)command;
 - (void)setEmailNotificationSubscriptionType:(CDVInvokedUrlCommand *)command;

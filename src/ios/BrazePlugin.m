@@ -18,6 +18,15 @@
   @property NSString *sessionTimeout;
   @property NSString *enableSDKAuth;
   @property NSString *sdkAuthCallbackID;
+  @property NSString *triggerActionMinimumTimeInterval;
+  @property NSString *pushAppGroup;
+  @property NSString *forwardUniversalLinks;
+  @property NSString *logLevel;
+  @property NSString *useUUIDAsDeviceId;
+  @property NSString *flushInterval;
+  @property NSString *useAutomaticRequestPolicy;
+  @property NSString *optInWhenPushAuthorized;
+
   @property (nonatomic, strong) CLLocationManager *locationManager;
   @property (nonatomic, strong) CDVInvokedUrlCommand *locationPermissionRequestCommand;
 @end
@@ -45,11 +54,23 @@ static Braze *_braze;
   self.disableUNAuthorizationOptionProvisional = settings[@"com.braze.ios_disable_un_authorization_option_provisional"];
   self.sessionTimeout = settings[@"com.braze.ios_session_timeout"];
   self.enableSDKAuth = settings[@"com.braze.sdk_authentication_enabled"];
+  self.triggerActionMinimumTimeInterval = settings[@"com.braze.trigger_action_minimum_time_interval_seconds"];
+  self.pushAppGroup = settings[@"com.braze.ios_push_app_group"];
+  self.forwardUniversalLinks = settings[@"com.braze.ios_forward_universal_links"];
+  self.logLevel = settings[@"com.braze.ios_log_level"];
+  self.useUUIDAsDeviceId = settings[@"com.braze.ios_use_uuid_as_device_id"];
+  self.flushInterval = settings[@"com.braze.ios_flush_interval_seconds"];
+  self.useAutomaticRequestPolicy = settings[@"com.braze.ios_use_automatic_request_policy"];
+  self.optInWhenPushAuthorized = settings[@"com.braze.should_opt_in_when_push_authorized"];
 
   [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didFinishLaunchingListener:) name:UIApplicationDidFinishLaunchingNotification object:nil];
 
-  if (![self.disableAutomaticPushHandling isEqualToString:@"YES"]) {
+  // Set automatic push handling
+  if (![[self sanitizeString:self.disableAutomaticPushHandling] isEqualToString:@"yes"]) {
     [AppDelegate swizzleHostAppDelegate];
+    NSLog(@"Automatic push handling enabled.");
+  } else {
+    NSLog(@"Automatic push handling disabled.");
   }
   
   self.locationManager = [[CLLocationManager alloc] init];
@@ -59,6 +80,8 @@ static Braze *_braze;
 - (void)didFinishLaunchingListener:(NSNotification *)notification {
   BRZConfiguration *configuration = [[BRZConfiguration alloc] initWithApiKey:self.APIKey
                                                                     endpoint:self.apiEndpoint];
+  
+  // Set SDK Flavor
   [configuration.api setSdkFlavor:BRZSDKFlavorCordova];
   
   // Set location collection and geofences from preferences
@@ -67,23 +90,122 @@ static Braze *_braze;
   [configuration.location setAutomaticLocationCollection:self.enableLocationCollection];
   [configuration.location setAutomaticGeofenceRequests:self.enableGeofences];
   
+  // Set the minimum logging level
+  NSNumber *level = [[[NSNumberFormatter alloc] init] numberFromString:self.logLevel];
+  NSInteger levelCast = [level integerValue];
+  if (level && levelCast >= 0 && levelCast <= 3) {
+    [configuration.logger setLevel:(BRZLoggerLevel)levelCast];
+    NSLog(@"Log level set to: %hhu", (BRZLoggerLevel)levelCast);
+  } else {
+    NSLog(@"Log level value not valid. Setting value to: error (2).");
+  }
+
+  [configuration.location setBrazeLocationProvider:[[BrazeLocationProvider alloc] init]];
+  
+  // Set location collection from preferences
+  if ([[self sanitizeString:self.enableLocationCollection] isEqualToString:@"yes"]) {
+    configuration.location.automaticLocationCollection = @YES;
+    NSLog(@"Location collection enabled.");
+  } else {
+    NSLog(@"Location collection disabled.");
+  }
+  
+  // Set geofences from preferences
+  if ([[self sanitizeString:self.enableGeofences] isEqualToString:@"yes"]) {
+    configuration.location.geofencesEnabled = @YES;
+    NSLog(@"Geofences enabled.");
+  } else {
+    NSLog(@"Geofences disabled.");
+  }
+  
+  // Set the minimum time interval between triggers (in seconds)
+  NSNumber *interval = [[[NSNumberFormatter alloc] init] numberFromString:self.triggerActionMinimumTimeInterval];
+  NSTimeInterval intervalCast = [interval doubleValue];
+  if (interval && intervalCast >= 0) {
+    [configuration setTriggerMinimumTimeInterval:intervalCast];
+    NSLog(@"Minimum time interval between trigger actions set to: %f", intervalCast);
+  } else {
+    NSLog(@"Minimum time interval between trigger actions value not valid. Setting value to 30.");
+  }
+  
+  // Sets if a randomly generated UUID should be used as the device ID
+  if ([[self sanitizeString:self.useUUIDAsDeviceId] isEqualToString:@"yes"]) {
+    configuration.useUUIDAsDeviceId = @YES;
+    NSLog(@"Using UUID as Device ID enabled.");
+  } else {
+    NSLog(@"Using UUID as Device ID disabled.");
+  }
+
+  // Set if the SDK should automatically recognize and forward universal links to the system methods
+  if ([[self sanitizeString:self.forwardUniversalLinks] isEqualToString:@"yes"]) {
+    configuration.forwardUniversalLinks = @YES;
+    NSLog(@"iOS universal link forwarding enabled.");
+  } else {
+    NSLog(@"iOS universal link forwarding disabled.");
+  }
+  
+  // Set if a user’s notification subscription state should be set to optedIn when push permissions are authorized
+  if ([[self sanitizeString:self.optInWhenPushAuthorized] isEqualToString:@"no"]) {
+    configuration.optInWhenPushAuthorized = @NO;
+    NSLog(@"User notification subscription state not automatically optedIn when push is authorized.");
+  } else {
+    NSLog(@"User notification subscription state automatically optedIn when push is authorized.");
+  }
+
   // Set the time interval for session time out (in seconds)
   NSNumber *timeout = [[[NSNumberFormatter alloc] init] numberFromString:self.sessionTimeout];
-  [configuration setSessionTimeout:[timeout doubleValue]];
+  NSTimeInterval timeoutCast = [timeout doubleValue];
+  if (timeout && timeoutCast >= 0) {
+    [configuration setSessionTimeout:timeoutCast];
+    NSLog(@"Session timeout interval set to: %f", timeoutCast);
+  } else {
+    NSLog(@"Session timeout interval value not valid. Setting value to 10.");
+  }
+  
+  // Set SDK Metadata
   [configuration.api addSDKMetadata:@[[BRZSDKMetadata cordova]]];
+  NSLog(@"SDK Metadata set.");
+  
+  // Set if request policy should be automatic or manual
+  if ([[self sanitizeString: self.useAutomaticRequestPolicy] isEqualToString:@"no"]) {
+    [configuration.api setRequestPolicy:BRZRequestPolicyManual];
+    NSLog(@"Request policy set to: Manual.");
+  } else {
+    NSLog(@"Request policy set to: Automatic.");
+  }
+  
+  // Set the interval in seconds between automatic data flushes
+  NSNumber *flushInterval = [[[NSNumberFormatter alloc] init] numberFromString:self.flushInterval];
+  NSTimeInterval flushIntervalCast = [flushInterval doubleValue];
+  if (flushInterval && flushIntervalCast >= 0) {
+    [configuration.api setFlushInterval:flushIntervalCast];
+    NSLog(@"Flush interval set to: %f", flushIntervalCast);
+  } else {
+    NSLog(@"Flush interval value not valid. Setting value to 10.");
+  }
+
+  // Set the app group identifier for push stories.
+  [configuration.push setAppGroup:self.pushAppGroup];
+  NSLog(@"Push app group set to: %@.", self.pushAppGroup);
+  
+  // Initialize Braze with set configurations
   self.braze = [[Braze alloc] initWithConfiguration:configuration];
   self.braze.inAppMessagePresenter = [[BrazeInAppMessageUI alloc] init];
   self.subscriptions = [NSMutableArray array];
 
   [BrazePlugin setBraze:self.braze];
-
+  NSLog(@"Braze initialized with set configurations.");
+  
   // Set the SDK authentication delegate
-  if ([self.enableSDKAuth isEqualToString:@"YES"]) {
+  if ([[self sanitizeString:self.enableSDKAuth] isEqualToString:@"yes"]) {
     NSLog(@"SDK authentication enabled. To receive and handle authentication errors, call `subscribeToSdkAuthenticationFailures`.");
     self.braze.sdkAuthDelegate = self;
+  } else {
+    NSLog(@"SDK authentication disabled.");
   }
 
-  if (![self.disableAutomaticPushRegistration isEqualToString:@"YES"]) {
+  // Set automatic push registration and request notification authorization
+  if (![[self sanitizeString:self.disableAutomaticPushRegistration] isEqualToString:@"yes"]) {
     UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
     // If the delegate hasn't been set yet, set it here in the plugin
     if (center.delegate == nil) {
@@ -91,7 +213,7 @@ static Braze *_braze;
     }
     UNAuthorizationOptions options = UNAuthorizationOptionAlert | UNAuthorizationOptionSound | UNAuthorizationOptionBadge;
     if (@available(iOS 12.0, *)) {
-      if (![self.disableUNAuthorizationOptionProvisional isEqualToString:@"YES"]) {
+      if (![[self sanitizeString:self.disableUNAuthorizationOptionProvisional] isEqualToString:@"yes"]) {
         options = options | UNAuthorizationOptionProvisional;
       }
     }
@@ -105,6 +227,9 @@ static Braze *_braze;
       }
     }];
     [[UIApplication sharedApplication] registerForRemoteNotifications];
+    NSLog(@"Automatic push registration enabled.");
+  } else {
+    NSLog(@"Automatic push registration disabled.");
   }
 }
 
@@ -323,6 +448,31 @@ static Braze *_braze;
   [self.braze.user setPhoneNumber:phone];
 }
 
+- (void)setLastKnownLocation:(CDVInvokedUrlCommand *)command {
+  NSNumber *latitude = [command argumentAtIndex:0 withDefault:nil];
+  NSNumber *longitude = [command argumentAtIndex:1 withDefault:nil];
+  NSNumber *altitude = [command argumentAtIndex:2 withDefault:nil];
+  NSNumber *horizontalAccuracy = [command argumentAtIndex:3 withDefault:nil];
+  NSNumber *verticalAccuracy = [command argumentAtIndex:4 withDefault:nil];
+
+  if (!latitude || !longitude || !horizontalAccuracy) {
+    NSLog(@"Invalid location information with the latitude: %@, longitude: %@, horizontalAccuracy: %@",
+          latitude ? latitude : @"nil",
+          longitude ? longitude : @"nil",
+          horizontalAccuracy ? horizontalAccuracy : @"nil");
+  } else if (!verticalAccuracy || !altitude) {
+    [self.braze.user setLastKnownLocationWithLatitude:[latitude doubleValue]
+                                             longitude:[longitude doubleValue]
+                                    horizontalAccuracy:[horizontalAccuracy doubleValue]];
+  } else {
+    [self.braze.user setLastKnownLocationWithLatitude:[latitude doubleValue]
+                                            longitude:[longitude doubleValue]
+                                             altitude:[altitude doubleValue]
+                                   horizontalAccuracy:[horizontalAccuracy doubleValue]
+                                     verticalAccuracy:[verticalAccuracy doubleValue]];
+  }
+}
+
 - (void)setPushNotificationSubscriptionType:(CDVInvokedUrlCommand *)command {
   NSString *subscriptionState = [command argumentAtIndex:0 withDefault:nil];
   [self.braze.user setPushNotificationSubscriptionState:[self getSubscriptionStateFromString:subscriptionState]];
@@ -503,7 +653,7 @@ static Braze *_braze;
 
 - (void)getDeviceId:(CDVInvokedUrlCommand *)command {
   NSString *deviceId = self.braze.deviceId;
-  [self sendCordovaErrorPluginResultWithString:deviceId andCommand:command];
+  [self sendCordovaSuccessPluginResultWithString:deviceId andCommand:command];
 }
 
 // MARK: - BrazeUI
@@ -726,10 +876,10 @@ static Braze *_braze;
       formattedContentCardData[@"domain"] = card.domain ?: [NSNull null];
       formattedContentCardData[@"type"] = @"Classic";
       break;
-    case BRZContentCardRawTypeBanner:
+    case BRZContentCardRawTypeImageOnly:
       formattedContentCardData[@"image"] = [card.image absoluteString];
       formattedContentCardData[@"imageAspectRatio"] = @(card.imageAspectRatio);
-      formattedContentCardData[@"type"] = @"Banner";
+      formattedContentCardData[@"type"] = @"ImageOnly";
       break;
     case BRZContentCardRawTypeCaptionedImage:
       formattedContentCardData[@"image"] = [card.image absoluteString];
@@ -764,7 +914,10 @@ static Braze *_braze;
 - (void)getFeatureFlag:(CDVInvokedUrlCommand *)command {
   NSString *featureFlagId = [command argumentAtIndex:0 withDefault:nil];
   BRZFeatureFlag *featureFlag = [self.braze.featureFlags featureFlagWithId:featureFlagId];
-  
+  if (featureFlag == nil) {
+    [self sendCordovaSuccessPluginResultAsNull:command];
+    return;
+  }
   NSError* error = nil;
   id flagJSON = [NSJSONSerialization JSONObjectWithData:[featureFlag json]
                                                 options:NSJSONReadingMutableContainers
@@ -799,6 +952,11 @@ static Braze *_braze;
   NSString *propertyKey = [command argumentAtIndex:1 withDefault:nil];
 
   BRZFeatureFlag *featureFlag = [self.braze.featureFlags featureFlagWithId:featureFlagId];
+  if (!featureFlag) {
+    [self sendCordovaSuccessPluginResultAsNull:command];
+    return;
+  }
+
   NSNumber *boolProperty = [featureFlag boolPropertyForKey:propertyKey];
   if (boolProperty) {
     [self sendCordovaSuccessPluginResultWithBool:boolProperty andCommand:command];
@@ -812,6 +970,11 @@ static Braze *_braze;
   NSString *propertyKey = [command argumentAtIndex:1 withDefault:nil];
 
   BRZFeatureFlag *featureFlag = [self.braze.featureFlags featureFlagWithId:featureFlagId];
+  if (!featureFlag) {
+    [self sendCordovaSuccessPluginResultAsNull:command];
+    return;
+  }
+
   NSString *stringProperty = [featureFlag stringPropertyForKey:propertyKey];
   if (stringProperty) {
     [self sendCordovaSuccessPluginResultWithString:stringProperty andCommand:command];
@@ -825,6 +988,11 @@ static Braze *_braze;
   NSString *propertyKey = [command argumentAtIndex:1 withDefault:nil];
 
   BRZFeatureFlag *featureFlag = [self.braze.featureFlags featureFlagWithId:featureFlagId];
+  if (!featureFlag) {
+    [self sendCordovaSuccessPluginResultAsNull:command];
+    return;
+  }
+
   NSNumber *numberProperty = [featureFlag numberPropertyForKey:propertyKey];
   if (numberProperty) {
     [self sendCordovaSuccessPluginResultWithDouble:[numberProperty doubleValue] andCommand:command];
@@ -922,6 +1090,16 @@ static Braze *_braze;
   CDVPluginResult *pluginResult = nil;
   pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:(NSString *)[NSNull null]];
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+}
+
+// MARK: - Helper Methods
+
+/**
+    Takes an NSString, trim whitespaces, and return the sanitized NSString converted to lowercase.
+ **/
+- (NSString *)sanitizeString:(NSString *)inputString {
+  NSString *trimmedString = [inputString stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+  return ([trimmedString lowercaseString]);
 }
 
 @end
