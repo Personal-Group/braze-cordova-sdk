@@ -69,6 +69,7 @@ var app = {
         document.getElementById("disableSdk").addEventListener("click", disableSdk);
         document.getElementById("requestFlushBtn").addEventListener("click", requestDataFlush);
         document.getElementById("setLanguageBtn").addEventListener("click", setLanguage);
+        document.getElementById("setLastKnownLocationBtn").addEventListener("click", setLastKnownLocation);
         document.getElementById("getDeviceId").addEventListener("click", getDeviceId);
         document.getElementById("requestPushPermission").addEventListener("click", requestPushPermission);
         BrazePlugin.subscribeToSdkAuthenticationFailures(customPluginSuccessCallback(), customPluginErrorCallback);
@@ -116,7 +117,16 @@ function setSdkAuthenticationSignature() {
 
 async function getFeatureFlag() {
     try {
-        const featureFlag = await BrazePlugin.getFeatureFlag(document.getElementById("featureFlagInputId").value);
+        const featureFlagId = document.getElementById("featureFlagInputId").value;
+        if (!featureFlagId) {
+            showTextBubble('Feature Flag ID not entered.');
+            return;
+        }
+        const featureFlag = await BrazePlugin.getFeatureFlag(featureFlagId);
+        if (!featureFlag) {
+            showTextBubble(`No Feature Flag found for ID: ${featureFlagId}`);
+            return;
+        }
         showTextBubble(`Feature Flag: ${JSON.stringify(featureFlag)}`);
     } catch (error) {
         // This method can error out if the Feature Flag fails to serialize at the native layer.
@@ -419,6 +429,18 @@ function setLanguage() {
     const languageCode = document.getElementById("languageCode").value;
     BrazePlugin.setLanguage(languageCode);
     showTextBubble(`Language set to ${languageCode}`);
+}
+
+function setLastKnownLocation() {
+    const latitude = document.getElementById("latitude").value ? document.getElementById("latitude").value : null;
+    const longitude = document.getElementById("longitude").value ? document.getElementById("longitude").value : null;
+    const altitude = document.getElementById("altitude").value ? document.getElementById("altitude").value : null;
+    const horizontalAccuracy = document.getElementById("horizontalAccuracy").value ? document.getElementById("horizontalAccuracy").value : null;
+    const verticalAccuracy = document.getElementById("verticalAccuracy").value ? document.getElementById("verticalAccuracy").value : null;
+    BrazePlugin.setLastKnownLocation(latitude, longitude, altitude, horizontalAccuracy, verticalAccuracy);
+    if (latitude && longitude) {
+        showTextBubble(`Last Known Location set to ${latitude}, ${longitude}`);
+    }
 }
 
 function getDeviceId() {

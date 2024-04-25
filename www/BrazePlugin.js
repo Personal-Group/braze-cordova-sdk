@@ -45,17 +45,6 @@ BrazePlugin.prototype.changeUser = function (userId, sdkAuthenticationToken) {
 *
 * Registers the device as eligible to receive push notifications from Braze.
 *
-* @param {string} registrationId - The registration ID / push token.
-*/
-BrazePlugin.prototype.registerAppboyPushMessages = function (registrationID) {
-	cordova.exec(null, null, "BrazePlugin", "registerAppboyPushMessages", [registrationID]);
-}
-
-/**
-* ** ANDROID ONLY**
-*
-* Registers the device as eligible to receive push notifications from Braze.
-*
 * @param {string} pushToken - The registration ID / push token.
 */
 BrazePlugin.prototype.setRegisteredPushToken = function (pushToken) {
@@ -274,6 +263,18 @@ BrazePlugin.prototype.setDateOfBirth = function (year, month, day) {
 }
 
 /**
+ * Sets the last known location for this user.
+ * @param {double} latitude
+ * @param {double} longitude
+ * @param {double} altitude (optional)
+ * @param {double} horizontalAccuracy (optional for Android)
+ * @param {double} verticalAccuracy (optional)
+ */
+BrazePlugin.prototype.setLastKnownLocation = function (latitude, longitude, altitude, horizontalAccuracy, verticalAccuracy) {
+	cordova.exec(null, null, "BrazePlugin", "setLastKnownLocation", [latitude, longitude, altitude, horizontalAccuracy, verticalAccuracy]);
+}
+
+/**
  * Sets whether the user should be sent push campaigns.
  * @param {NotificationSubscriptionTypes} notificationSubscriptionType - Notification setting (explicitly
  *    opted-in, subscribed, or unsubscribed).
@@ -487,9 +488,7 @@ BrazePlugin.prototype.getDeviceId = function (successCallback, errorCallback) {
  * not force a refresh.
  *
  * @param id The ID of the Feature Flag to retrieve.
- * @return A promise containing the [FeatureFlag] of the requested ID.
- * If the Feature Flag does not exist, a [FeatureFlag] will be returned with 
- * enabled set to `false` and empty properties.
+ * @return A promise containing the [FeatureFlag] of the requested ID, or null if the Feature Flag does not exist.
  */
 BrazePlugin.prototype.getFeatureFlag = function (id) {
 	return new Promise((resolve, reject) => {
@@ -537,7 +536,7 @@ BrazePlugin.prototype.subscribeToFeatureFlagsUpdates = function (flagId, propert
  * @param {string} flagId - The identifier for the Feature Flag.
  * @param {string} propertyKey - The key for the boolean property.
  * 
- * @return A promise containing the boolean property requested. This should return null if there is no such property.
+ * @return A promise containing the boolean property requested. This will return null if there is no such property or Feature Flag.
  */
 BrazePlugin.prototype.getFeatureFlagBooleanProperty = function(flagId, propertyKey) {
 	return new Promise((resolve, reject) => {
@@ -554,7 +553,7 @@ BrazePlugin.prototype.getFeatureFlagBooleanProperty = function(flagId, propertyK
  * @param {string} flagId - The identifier for the Feature Flag.
  * @param {string} propertyKey - The key for the string property.
  * 
- * @return A promise containing the string property requested. This should return null if there is no such property.
+ * @return A promise containing the string property requested. This will return null if there is no such property or Feature Flag.
  */
 BrazePlugin.prototype.getFeatureFlagStringProperty = function(flagId, propertyKey) {
 	return new Promise((resolve, reject) => {
@@ -571,7 +570,7 @@ BrazePlugin.prototype.getFeatureFlagStringProperty = function(flagId, propertyKe
  * @param {string} flagId - The identifier for the Feature Flag.
  * @param {string} propertyKey - The key for the number property.
  * 
- * @return A promise containing the number property requested. This should return null if there is no such property.
+ * @return A promise containing the number property requested. This will return null if there is no such property or Feature Flag.
  */
 BrazePlugin.prototype.getFeatureFlagNumberProperty = function(flagId, propertyKey) {
 	return new Promise((resolve, reject) => {
@@ -626,7 +625,7 @@ BrazePlugin.prototype['CardCategories'] = {
 
 BrazePlugin.prototype['ContentCardTypes'] = {
 	'CLASSIC': 'Classic',
-	'BANNER': 'Banner',
+	'IMAGE_ONLY': 'ImageOnly',
 	'CAPTIONED': 'Captioned'
 };
 
