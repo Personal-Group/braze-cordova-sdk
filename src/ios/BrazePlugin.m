@@ -7,7 +7,7 @@
 @import UserNotifications;
 @import CoreLocation;
 
-@interface BrazePlugin() <BrazeSDKAuthDelegate, CLLocationManagerDelegate>
+@interface BrazePlugin() <BrazeSDKAuthDelegate, BrazeInAppMessageUIDelegate, CLLocationManagerDelegate>
   @property NSString *APIKey;
   @property NSString *disableAutomaticPushRegistration;
   @property NSString *disableAutomaticPushHandling;
@@ -34,6 +34,8 @@
 static Braze *_braze;
 
 @implementation BrazePlugin
+
+bool isInAppMessageSubscribed;
 
 + (Braze *)braze {
   return _braze;
@@ -62,6 +64,7 @@ static Braze *_braze;
   self.flushInterval = settings[@"com.braze.ios_flush_interval_seconds"];
   self.useAutomaticRequestPolicy = settings[@"com.braze.ios_use_automatic_request_policy"];
   self.optInWhenPushAuthorized = settings[@"com.braze.should_opt_in_when_push_authorized"];
+  isInAppMessageSubscribed = NO;
 
   [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didFinishLaunchingListener:) name:UIApplicationDidFinishLaunchingNotification object:nil];
 
@@ -190,12 +193,16 @@ static Braze *_braze;
   
   // Initialize Braze with set configurations
   self.braze = [[Braze alloc] initWithConfiguration:configuration];
-  self.braze.inAppMessagePresenter = [[BrazeInAppMessageUI alloc] init];
   self.subscriptions = [NSMutableArray array];
 
   [BrazePlugin setBraze:self.braze];
   NSLog(@"Braze initialized with set configurations.");
-  
+
+  // In-App Message UI
+  BrazeInAppMessageUI *inAppMessageUI = [[BrazeInAppMessageUI alloc] init];
+  inAppMessageUI.delegate = self;
+  self.braze.inAppMessagePresenter = inAppMessageUI;
+
   // Set the SDK authentication delegate
   if ([[self sanitizeString:self.enableSDKAuth] isEqualToString:@"yes"]) {
     NSLog(@"SDK authentication enabled. To receive and handle authentication errors, call `subscribeToSdkAuthenticationFailures`.");
@@ -656,6 +663,10 @@ static Braze *_braze;
   [self sendCordovaSuccessPluginResultWithString:deviceId andCommand:command];
 }
 
+- (void)updateTrackingPropertyAllowList:(CDVInvokedUrlCommand *)command {
+  NSLog(@"Tracking support removed.");
+}
+
 // MARK: - BrazeUI
 - (void)launchNewsFeed:(CDVInvokedUrlCommand *)command {
   NSLog(@"News Feed UI not supported on iOS.");
@@ -910,6 +921,104 @@ static Braze *_braze;
   }
 }
 
+// MARK: - In-App Messages
+
+/// Subscribes to in-app message updates.
+- (void)subscribeToInAppMessage:(CDVInvokedUrlCommand *)command {
+  bool useBrazeUI = [command argumentAtIndex:0 withDefault:nil];
+  if (!useBrazeUI) {
+    // A custom delegate is being used. Do nothing.
+    return;
+  }
+  isInAppMessageSubscribed = YES;
+}
+
+/// Hides the currently displayed in-app message.
+- (void)hideCurrentInAppMessage:(CDVInvokedUrlCommand *)command {
+  [(BrazeInAppMessageUI *)self.braze.inAppMessagePresenter dismiss];
+}
+
+/// Logs an in-app message impression.
+- (void)logInAppMessageImpression:(CDVInvokedUrlCommand *)command {
+  NSString *inAppMessageString  = [command argumentAtIndex:0 withDefault:nil];
+  NSLog(@"logInAppMessageImpression called with value %@", inAppMessageString);
+  BRZInAppMessageRaw *inAppMessage = [self getInAppMessageFromString:inAppMessageString];
+  if (inAppMessage) {
+    [inAppMessage logImpressionUsing:self.braze];
+  } else {
+    NSLog(@"logInAppMessageImpression could not parse inAppMessage. Not logging impression.");
+  }
+}
+
+/// Logs when an in-app message was clicked.
+- (void)logInAppMessageClicked:(CDVInvokedUrlCommand *)command {
+  NSString *inAppMessageString  = [command argumentAtIndex:0 withDefault:nil];
+  NSLog(@"logInAppMessageClicked called with value %@", inAppMessageString);
+  BRZInAppMessageRaw *inAppMessage = [self getInAppMessageFromString:inAppMessageString];
+  if (inAppMessage) {
+    [inAppMessage logClickWithButtonId:nil using:self.braze];
+  } else {
+    NSLog(@"logInAppMessageClicked could not parse inAppMessage. Not logging click.");
+  }
+}
+
+/// Logs when an in-app message button was clicked.
+- (void)logInAppMessageButtonClicked:(CDVInvokedUrlCommand *)command {
+  NSString *inAppMessageString  = [command argumentAtIndex:0 withDefault:nil];
+  NSNumber *button = [command argumentAtIndex:1 withDefault:0];
+  NSLog(@"logInAppMessageButtonClicked called with value %@, button: %@", inAppMessageString, button);
+  BRZInAppMessageRaw *inAppMessage = [self getInAppMessageFromString:inAppMessageString];
+  double buttonId = [button doubleValue];
+  if (inAppMessage) {
+    [inAppMessage logClickWithButtonId:[@(buttonId) stringValue] using:self.braze];
+  } else {
+    NSLog(@"logInAppMessageButtonClicked could not parse inAppMessage. Not logging button click.");
+  }
+}
+
+/// Process and perform in-app message click actions.
+- (void)performInAppMessageAction:(CDVInvokedUrlCommand *)command {
+  NSString *inAppMessageString  = [command argumentAtIndex:0 withDefault:nil];
+  NSNumber *button = [command argumentAtIndex:1 withDefault:0];
+  NSLog(@"performInAppMessageAction called with value %@, and button %@", inAppMessageString, button);
+  BRZInAppMessageRaw *inAppMessage = [self getInAppMessageFromString:inAppMessageString];
+  
+  double buttonId = [button doubleValue];
+  
+  if (inAppMessage) {
+    NSURL* url = nil;
+    BOOL useWebView = NO;
+    BRZInAppMessageRawClickAction clickAction = BRZInAppMessageRawClickActionURL;
+      
+    if (buttonId < 0) {
+      url = inAppMessage.url;
+      useWebView = inAppMessage.useWebView;
+      clickAction = inAppMessage.clickAction;
+    } else {
+      for(int i = 0; i < inAppMessage.buttons.count; i++) {
+        if (inAppMessage.buttons[i].identifier == buttonId) {
+          url = inAppMessage.buttons[i].url;
+          useWebView = inAppMessage.buttons[i].useWebView;
+          clickAction = inAppMessage.buttons[i].clickAction;
+        }
+      }
+    }
+      
+    NSLog(@"performInAppMessageAction trying %@", inAppMessage.url);
+    inAppMessage.context = [[BRZInAppMessageContext alloc] initWithMessageRaw:inAppMessage using:self.braze];
+    [inAppMessage.context processClickAction:clickAction url:url useWebView:useWebView];
+  } else {
+    NSLog(@"performInAppMessageAction could not parse inAppMessage. Not performing action.");
+  }
+}
+
+/// Returns the in-app message for the JSON string. If the JSON fails decoding, returns nil.
+- (BRZInAppMessageRaw *)getInAppMessageFromString:(NSString *)inAppMessageJSONString {
+  NSData *inAppMessageData = [inAppMessageJSONString dataUsingEncoding:NSUTF8StringEncoding];
+  BRZInAppMessageRaw *message = [BRZInAppMessageRaw decodingWithJson:inAppMessageData];
+  return message;
+}
+
 // MARK: - Feature Flags
 - (void)getFeatureFlag:(CDVInvokedUrlCommand *)command {
   NSString *featureFlagId = [command argumentAtIndex:0 withDefault:nil];
@@ -1100,6 +1209,67 @@ static Braze *_braze;
 - (NSString *)sanitizeString:(NSString *)inputString {
   NSString *trimmedString = [inputString stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
   return ([trimmedString lowercaseString]);
+}
+
+- (BRZTrackingProperty *)convertTrackingProperty:(NSString *)propertyString {
+  if ([propertyString isEqualToString:@"all_custom_attributes"]) {
+    return BRZTrackingProperty.allCustomAttributes;
+  } else if ([propertyString isEqualToString:@"all_custom_events"]) {
+    return BRZTrackingProperty.allCustomEvents;
+  } else if ([propertyString isEqualToString:@"analytics_events"]) {
+    return BRZTrackingProperty.analyticsEvents;
+  } else if ([propertyString isEqualToString:@"attribution_data"]) {
+    return BRZTrackingProperty.attributionData;
+  } else if ([propertyString isEqualToString:@"country"]) {
+    return BRZTrackingProperty.country;
+  } else if ([propertyString isEqualToString:@"dob"]) {
+    return BRZTrackingProperty.dateOfBirth;
+  } else if ([propertyString isEqualToString:@"device_data"]) {
+    return BRZTrackingProperty.deviceData;
+  } else if ([propertyString isEqualToString:@"email"]) {
+    return BRZTrackingProperty.email;
+  } else if ([propertyString isEqualToString:@"email_subscription_state"]) {
+    return BRZTrackingProperty.emailSubscriptionState;
+  } else if ([propertyString isEqualToString:@"everything"]) {
+    return BRZTrackingProperty.everything;
+  } else if ([propertyString isEqualToString:@"first_name"]) {
+    return BRZTrackingProperty.firstName;
+  } else if ([propertyString isEqualToString:@"gender"]) {
+    return BRZTrackingProperty.gender;
+  } else if ([propertyString isEqualToString:@"home_city"]) {
+    return BRZTrackingProperty.homeCity;
+  } else if ([propertyString isEqualToString:@"language"]) {
+    return BRZTrackingProperty.language;
+  } else if ([propertyString isEqualToString:@"last_name"]) {
+    return BRZTrackingProperty.lastName;
+  } else if ([propertyString isEqualToString:@"notification_subscription_state"]) {
+    return BRZTrackingProperty.notificationSubscriptionState;
+  } else if ([propertyString isEqualToString:@"phone_number"]) {
+    return BRZTrackingProperty.phoneNumber;
+  } else if ([propertyString isEqualToString:@"push_token"]) {
+    return BRZTrackingProperty.pushToken;
+  } else {
+    NSLog(@"Invalid tracking property: %@", propertyString);
+    return nil;
+  }
+}
+
+// MARK: - BrazeInAppMessageUIDelegate
+
+- (void)inAppMessage:(BrazeInAppMessageUI *)ui
+          didPresent:(BRZInAppMessageRaw *)message
+                  view:(UIView *)view {
+  if (!isInAppMessageSubscribed) {
+    return;
+  }
+  // Convert in-app message to string
+  NSData *inAppMessageData = [message json];
+  NSString *inAppMessageString = [[NSString alloc] initWithData:inAppMessageData encoding:NSUTF8StringEncoding];
+  NSLog(@"In-app message received: %@", inAppMessageString);
+
+  // Send in-app message string back to JavaScript in an `inAppMessageReceived` event
+  NSString* jsStatement = [NSString stringWithFormat:@"app.inAppMessageReceived('%@');", inAppMessageString];
+  [self.commandDelegate evalJs:jsStatement];
 }
 
 @end
