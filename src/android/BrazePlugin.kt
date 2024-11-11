@@ -982,6 +982,7 @@ open class BrazePlugin : CordovaPlugin() {
                 cordova.requestPermission(this, LOCATION_REQUEST_CODE, fineLocationPermission)
             }
         }
+    }
 
     private fun setDefaultInAppMessageListener() {
         BrazeInAppMessageManager.getInstance().setCustomInAppMessageManagerListener(
