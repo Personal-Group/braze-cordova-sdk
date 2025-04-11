@@ -153,8 +153,6 @@ bool useBrazeUIForInAppMessages;
     NSLog(@"Automatic push handling disabled.");
   }
 
-<<<<<<< HEAD
-=======
   // Set display foreground push notifications
   if ([[self sanitizeString:self.displayForegroundPushNotifications] isEqualToString:@"yes"]) {
     configuration.push.automation.willPresentNotification = YES;
@@ -184,7 +182,6 @@ bool useBrazeUIForInAppMessages;
     NSLog(@"Automatic push registration disabled.");
   }
 
->>>>>>> 19b2eca13ec5243f3c03853c0ce30f8a3ad8a9a1
   [configuration.location setBrazeLocationProvider:[[BrazeLocationProvider alloc] init]];
   
   // Set location collection from preferences

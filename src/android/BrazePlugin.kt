@@ -25,11 +25,6 @@ import com.braze.models.inappmessage.InAppMessageImmersiveBase
 import com.braze.models.inappmessage.MessageButton
 import com.braze.models.outgoing.AttributionData
 import com.braze.models.outgoing.BrazeProperties
-import com.braze.models.inappmessage.IInAppMessage
-import com.braze.models.inappmessage.IInAppMessageImmersive
-import com.braze.models.inappmessage.InAppMessageBase
-import com.braze.models.inappmessage.InAppMessageImmersiveBase
-import com.braze.models.inappmessage.MessageButton
 import com.braze.support.BrazeLogger.Priority.*
 import com.braze.support.BrazeLogger.brazelog
 import com.braze.support.BrazeLogger.logLevel
