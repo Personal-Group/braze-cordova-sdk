@@ -1,4 +1,5 @@
 #import "BrazePlugin.h"
+#import "AppDelegate+Braze.h"
 
 @import BrazeKit;
 @import BrazeLocation;
@@ -7,39 +8,27 @@
 @import CoreLocation;
 
 @interface BrazePlugin() <BrazeSDKAuthDelegate, BrazeInAppMessageUIDelegate, CLLocationManagerDelegate>
-  // Api
   @property NSString *APIKey;
-  @property NSString *apiEndpoint;
-  @property NSString *useAutomaticRequestPolicy;
-  @property NSString *flushInterval;
-  @property NSString *enableSDKAuth;
-
-  // Push
-  @property NSString *pushAppGroup;
-  @property NSString *disableAutomaticPushHandling;
   @property NSString *disableAutomaticPushRegistration;
-  @property NSString *disableUNAuthorizationOptionProvisional;
-  @property NSString *displayForegroundPushNotifications;
-
-  // Location
+  @property NSString *disableAutomaticPushHandling;
+  @property NSString *apiEndpoint;
   @property NSString *enableLocationCollection;
   @property NSString *enableGeofences;
-
-  // Logger
-  @property NSString *logLevel;
-
-  // General
+  @property NSString *disableUNAuthorizationOptionProvisional;
   @property NSString *sessionTimeout;
+  @property NSString *enableSDKAuth;
+  @property NSString *sdkAuthCallbackID;
   @property NSString *triggerActionMinimumTimeInterval;
-  @property NSString *useUUIDAsDeviceId;
+  @property NSString *pushAppGroup;
   @property NSString *forwardUniversalLinks;
+  @property NSString *logLevel;
+  @property NSString *useUUIDAsDeviceId;
+  @property NSString *flushInterval;
+  @property NSString *useAutomaticRequestPolicy;
   @property NSString *optInWhenPushAuthorized;
 
   @property (nonatomic, strong) CLLocationManager *locationManager;
   @property (nonatomic, strong) CDVInvokedUrlCommand *locationPermissionRequestCommand;
-
-  // Others
-  @property NSString *sdkAuthCallbackID;
 @end
 
 static Braze *_braze;
@@ -47,7 +36,6 @@ static Braze *_braze;
 @implementation BrazePlugin
 
 bool isInAppMessageSubscribed;
-bool useBrazeUIForInAppMessages;
 
 + (Braze *)braze {
   return _braze;
@@ -59,39 +47,23 @@ bool useBrazeUIForInAppMessages;
 
 - (void)pluginInitialize {
   NSDictionary *settings = self.commandDelegate.settings;
-  
-  // Api
-  self.APIKey = settings[@"com.braze.ios_api_key"];
-  if (self.APIKey == nil) {
-    // Fallback to the deprecated API key setting
-    self.APIKey = settings[@"com.braze.api_key"];
-  }
-  self.apiEndpoint = settings[@"com.braze.ios_api_endpoint"];
-  self.useAutomaticRequestPolicy = settings[@"com.braze.ios_use_automatic_request_policy"];
-  self.flushInterval = settings[@"com.braze.ios_flush_interval_seconds"];
-  self.enableSDKAuth = settings[@"com.braze.sdk_authentication_enabled"];
-  
-  // Push
-  self.pushAppGroup = settings[@"com.braze.ios_push_app_group"];
-  self.disableAutomaticPushHandling = settings[@"com.braze.ios_disable_automatic_push_handling"];
+  self.APIKey = settings[@"com.braze.api_key"];
   self.disableAutomaticPushRegistration = settings[@"com.braze.ios_disable_automatic_push_registration"];
-  self.disableUNAuthorizationOptionProvisional = settings[@"com.braze.ios_disable_un_authorization_option_provisional"];
-  self.displayForegroundPushNotifications = settings[@"com.braze.display_foreground_push_notifications"];
-  
-  // Location
+  self.disableAutomaticPushHandling = settings[@"com.braze.ios_disable_automatic_push_handling"];
+  self.apiEndpoint = settings[@"com.braze.ios_api_endpoint"];
   self.enableLocationCollection = settings[@"com.braze.enable_location_collection"];
   self.enableGeofences = settings[@"com.braze.geofences_enabled"];
-  
-  // Logger
-  self.logLevel = settings[@"com.braze.ios_log_level"];
-  
-  // General
+  self.disableUNAuthorizationOptionProvisional = settings[@"com.braze.ios_disable_un_authorization_option_provisional"];
   self.sessionTimeout = settings[@"com.braze.ios_session_timeout"];
+  self.enableSDKAuth = settings[@"com.braze.sdk_authentication_enabled"];
   self.triggerActionMinimumTimeInterval = settings[@"com.braze.trigger_action_minimum_time_interval_seconds"];
-  self.useUUIDAsDeviceId = settings[@"com.braze.ios_use_uuid_as_device_id"];
+  self.pushAppGroup = settings[@"com.braze.ios_push_app_group"];
   self.forwardUniversalLinks = settings[@"com.braze.ios_forward_universal_links"];
+  self.logLevel = settings[@"com.braze.ios_log_level"];
+  self.useUUIDAsDeviceId = settings[@"com.braze.ios_use_uuid_as_device_id"];
+  self.flushInterval = settings[@"com.braze.ios_flush_interval_seconds"];
+  self.useAutomaticRequestPolicy = settings[@"com.braze.ios_use_automatic_request_policy"];
   self.optInWhenPushAuthorized = settings[@"com.braze.should_opt_in_when_push_authorized"];
-
   isInAppMessageSubscribed = NO;
 
   [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didFinishLaunchingListener:) name:UIApplicationDidFinishLaunchingNotification object:nil];
@@ -106,11 +78,6 @@ bool useBrazeUIForInAppMessages;
   
   self.locationManager = [[CLLocationManager alloc] init];
   self.locationManager.delegate = self;
-  
-  isInAppMessageSubscribed = NO;
-  useBrazeUIForInAppMessages = YES;
-
-  [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didFinishLaunchingListener:) name:UIApplicationDidFinishLaunchingNotification object:nil];
 }
 
 - (void)didFinishLaunchingListener:(NSNotification *)notification {
@@ -135,56 +102,7 @@ bool useBrazeUIForInAppMessages;
   } else {
     NSLog(@"Log level value not valid. Setting value to: error (2).");
   }
-  
-  // ---- Push Notifications configuration
-  
-  // Set push automation from preferences
-  if (![[self sanitizeString:self.disableAutomaticPushHandling] isEqualToString:@"yes"]) {
-    // Enables all push automation
-    configuration.push.automation = [[BRZConfigurationPushAutomation alloc] initEnablingAllAutomations:YES];
-    // - Disable `willPresentNotification`, this is configured below from the
-    //   `displayForegroundPushNotifications` setting
-    configuration.push.automation.willPresentNotification = NO;
-    // - Disable `requestAuthorizationAtLaunch`, this is configured below from the
-    //   `disableAutomaticPushRegistration` setting
-    configuration.push.automation.requestAuthorizationAtLaunch = NO;
-    NSLog(@"Automatic push handling enabled.");
-  } else {
-    NSLog(@"Automatic push handling disabled.");
-  }
 
-<<<<<<< HEAD
-=======
-  // Set display foreground push notifications
-  if ([[self sanitizeString:self.displayForegroundPushNotifications] isEqualToString:@"yes"]) {
-    configuration.push.automation.willPresentNotification = YES;
-    NSLog(@"Foreground push notifications enabled.");
-  } else {
-    NSLog(@"Foreground push notifications disabled.");
-  }
-  
-  // Set automatic request notification authorization
-  if (![[self sanitizeString:self.disableAutomaticPushRegistration] isEqualToString:@"yes"]) {
-    // Enable automatic push registration and device token registration
-    configuration.push.automation.automaticSetup = YES;
-    configuration.push.automation.registerDeviceToken = YES;
-    // Enable request notification authorization
-    configuration.push.automation.requestAuthorizationAtLaunch = YES;
-    NSLog(@"Automatic push registration enabled.");
-    // Set provisional notification authorization
-    if (@available(iOS 12.0, *)) {
-      if (![[self sanitizeString:self.disableUNAuthorizationOptionProvisional] isEqualToString:@"yes"]) {
-        configuration.push.automation.authorizationOptions |= UNAuthorizationOptionProvisional;
-        NSLog(@"Provisional push authorization enabled.");
-      } else {
-        NSLog(@"Provisional push authorization disabled.");
-      }
-    }
-  } else {
-    NSLog(@"Automatic push registration disabled.");
-  }
-
->>>>>>> 19b2eca13ec5243f3c03853c0ce30f8a3ad8a9a1
   [configuration.location setBrazeLocationProvider:[[BrazeLocationProvider alloc] init]];
   
   // Set location collection from preferences
@@ -292,6 +210,34 @@ bool useBrazeUIForInAppMessages;
   } else {
     NSLog(@"SDK authentication disabled.");
   }
+
+  // Set automatic push registration and request notification authorization
+  if (![[self sanitizeString:self.disableAutomaticPushRegistration] isEqualToString:@"yes"]) {
+    UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
+    // If the delegate hasn't been set yet, set it here in the plugin
+    if (center.delegate == nil) {
+      center.delegate = [UIApplication sharedApplication].delegate;
+    }
+    UNAuthorizationOptions options = UNAuthorizationOptionAlert | UNAuthorizationOptionSound | UNAuthorizationOptionBadge;
+    if (@available(iOS 12.0, *)) {
+      if (![[self sanitizeString:self.disableUNAuthorizationOptionProvisional] isEqualToString:@"yes"]) {
+        options = options | UNAuthorizationOptionProvisional;
+      }
+    }
+    [center requestAuthorizationWithOptions:options
+                          completionHandler:^(BOOL granted, NSError *_Nullable error) {
+      // Braze automatically retrieves the push notification authorization settings after the user interacts with the permission prompt.
+      if (error) {
+        NSLog(@"%@", error.debugDescription);
+      } else {
+        NSLog(@"Notification authorization successfully requested.");
+      }
+    }];
+    [[UIApplication sharedApplication] registerForRemoteNotifications];
+    NSLog(@"Automatic push registration enabled.");
+  } else {
+    NSLog(@"Automatic push registration disabled.");
+  }
 }
 
 // MARK: - Braze
@@ -303,16 +249,6 @@ bool useBrazeUIForInAppMessages;
   } else if (userId) {
     [self.braze changeUser:userId];
   }
-}
-
-- (void)getUserId:(CDVInvokedUrlCommand *)command {
-  [self.braze.user idWithCompletion:^(NSString * _Nullable userId) {
-    if (!userId) {
-      [self sendCordovaSuccessPluginResultAsNull:command];
-    } else {
-      [self sendCordovaSuccessPluginResultWithString:userId andCommand:command];
-    }
-  }];
 }
 
 - (void)setSdkAuthenticationSignature:(CDVInvokedUrlCommand *)command {
@@ -541,23 +477,6 @@ bool useBrazeUIForInAppMessages;
                                              altitude:[altitude doubleValue]
                                    horizontalAccuracy:[horizontalAccuracy doubleValue]
                                      verticalAccuracy:[verticalAccuracy doubleValue]];
-  }
-}
-
-- (void)setLocationCustomAttribute:(CDVInvokedUrlCommand *)command {
-  NSString *key = [command argumentAtIndex:0 withDefault:nil];
-  NSNumber *latitude = [command argumentAtIndex:1 withDefault:nil];
-  NSNumber *longitude = [command argumentAtIndex:2 withDefault:nil];
-  
-  if (!latitude || !longitude) {
-    NSLog(@"Invalid location information with the latitude: %@, longitude: %@",
-          latitude ? latitude : @"nil",
-          longitude ? longitude : @"nil");
-  } else {
-    [self.braze.user setLocationCustomAttributeWithKey:key
-                                              latitude:[latitude doubleValue]
-                                             longitude:[longitude doubleValue]];
-    NSLog(@"Location custom attribute set with key: %@, latitude: %@, longitude: %@", key, latitude, longitude);
   }
 }
 
@@ -912,7 +831,6 @@ bool useBrazeUIForInAppMessages;
   [self.braze.contentCards requestRefreshWithCompletion:^(NSArray<BRZContentCardRaw *> * _Nullable cards, NSError * _Nullable error) {
     if (error) {
       NSLog(@"%@", error.debugDescription);
-      [self sendCordovaErrorPluginResultWithString:error.debugDescription andCommand:command];
     } else {
       NSLog(@"Got Content Cards from server callback");
       [self getContentCardsFromCache:command];
@@ -1012,7 +930,10 @@ bool useBrazeUIForInAppMessages;
 /// Subscribes to in-app message updates.
 - (void)subscribeToInAppMessage:(CDVInvokedUrlCommand *)command {
   bool useBrazeUI = [command argumentAtIndex:0 withDefault:nil];
-  useBrazeUIForInAppMessages = useBrazeUI;
+  if (!useBrazeUI) {
+    // A custom delegate is being used. Do nothing.
+    return;
+  }
   isInAppMessageSubscribed = YES;
 }
 
@@ -1193,60 +1114,6 @@ bool useBrazeUIForInAppMessages;
   }
 }
 
-- (void)getFeatureFlagTimestampProperty:(CDVInvokedUrlCommand *)command {
-  NSString *featureFlagId = [command argumentAtIndex:0 withDefault:nil];
-  NSString *propertyKey = [command argumentAtIndex:1 withDefault:nil];
-
-  BRZFeatureFlag *featureFlag = [self.braze.featureFlags featureFlagWithId:featureFlagId];
-  if (!featureFlag) {
-    [self sendCordovaSuccessPluginResultAsNull:command];
-    return;
-  }
-
-  NSNumber *timestampProperty = [featureFlag timestampPropertyForKey:propertyKey];
-  if (timestampProperty) {
-    [self sendCordovaSuccessPluginResultWithDouble:[timestampProperty doubleValue] andCommand:command];
-  } else {
-    [self sendCordovaSuccessPluginResultAsNull:command];
-  }
-}
-
-- (void)getFeatureFlagJSONProperty:(CDVInvokedUrlCommand *)command {
-  NSString *featureFlagId = [command argumentAtIndex:0 withDefault:nil];
-  NSString *propertyKey = [command argumentAtIndex:1 withDefault:nil];
-
-  BRZFeatureFlag *featureFlag = [self.braze.featureFlags featureFlagWithId:featureFlagId];
-  if (!featureFlag) {
-    [self sendCordovaSuccessPluginResultAsNull:command];
-    return;
-  }
-
-  NSDictionary *jsonProperty = [featureFlag jsonObjectPropertyForKey:propertyKey];
-  if (jsonProperty) {
-    [self sendCordovaSuccessPluginResultWithDictionary:jsonProperty andCommand:command];
-  } else {
-    [self sendCordovaSuccessPluginResultAsNull:command];
-  }
-}
-
-- (void)getFeatureFlagImageProperty:(CDVInvokedUrlCommand *)command {
-  NSString *featureFlagId = [command argumentAtIndex:0 withDefault:nil];
-  NSString *propertyKey = [command argumentAtIndex:1 withDefault:nil];
-
-  BRZFeatureFlag *featureFlag = [self.braze.featureFlags featureFlagWithId:featureFlagId];
-  if (!featureFlag) {
-    [self sendCordovaSuccessPluginResultAsNull:command];
-    return;
-  }
-
-  NSString *imageProperty = [featureFlag imagePropertyForKey:propertyKey];
-  if (imageProperty) {
-    [self sendCordovaSuccessPluginResultWithString:imageProperty andCommand:command];
-  } else {
-    [self sendCordovaSuccessPluginResultAsNull:command];
-  }
-}
-
 - (void)logFeatureFlagImpression:(CDVInvokedUrlCommand *)command {
   NSString *featureFlagId = [command argumentAtIndex:0 withDefault:nil];
   if (featureFlagId) {
@@ -1341,51 +1208,11 @@ bool useBrazeUIForInAppMessages;
 // MARK: - Helper Methods
 
 /**
- * Takes an NSString, trim whitespaces, and return the sanitized NSString converted to lowercase.
- */
+    Takes an NSString, trim whitespaces, and return the sanitized NSString converted to lowercase.
+ **/
 - (NSString *)sanitizeString:(NSString *)inputString {
   NSString *trimmedString = [inputString stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
   return ([trimmedString lowercaseString]);
-}
-
-/**
- * Map an `NSString` to a JavaScript-representable version.
- * Escape characters are lost in translation, so we need to manually insert them back in.
- */
-- (NSString *)escapeStringForJavaScript:(NSString *)input {
-  NSMutableString *escapedString = [NSMutableString stringWithString:input];
-
-  [escapedString replaceOccurrencesOfString:@"\\"
-                                 withString:@"\\\\"
-                                    options:NSLiteralSearch
-                                      range:NSMakeRange(0, [escapedString length])];
-
-  [escapedString replaceOccurrencesOfString:@"\""
-                                 withString:@"\\\""
-                                    options:NSLiteralSearch
-                                      range:NSMakeRange(0, [escapedString length])];
-
-  [escapedString replaceOccurrencesOfString:@"\'"
-                                 withString:@"\\\'"
-                                    options:NSLiteralSearch
-                                      range:NSMakeRange(0, [escapedString length])];
-
-  [escapedString replaceOccurrencesOfString:@"\n"
-                                 withString:@"\\n"
-                                    options:NSLiteralSearch
-                                      range:NSMakeRange(0, [escapedString length])];
-
-  [escapedString replaceOccurrencesOfString:@"\r"
-                                 withString:@"\\r"
-                                    options:NSLiteralSearch
-                                      range:NSMakeRange(0, [escapedString length])];
-
-  [escapedString replaceOccurrencesOfString:@"\t"
-                                 withString:@"\\t"
-                                    options:NSLiteralSearch
-                                      range:NSMakeRange(0, [escapedString length])];
-
-  return escapedString;
 }
 
 - (BRZTrackingProperty *)convertTrackingProperty:(NSString *)propertyString {
@@ -1433,24 +1260,20 @@ bool useBrazeUIForInAppMessages;
 
 // MARK: - BrazeInAppMessageUIDelegate
 
-- (enum BRZInAppMessageUIDisplayChoice)inAppMessage:(BrazeInAppMessageUI *)ui displayChoiceForMessage:(BRZInAppMessageRaw *)message {
+- (void)inAppMessage:(BrazeInAppMessageUI *)ui
+          didPresent:(BRZInAppMessageRaw *)message
+                  view:(UIView *)view {
+  if (!isInAppMessageSubscribed) {
+    return;
+  }
   // Convert in-app message to string
-  if (isInAppMessageSubscribed) {
-    NSData *inAppMessageData = [message json];
-    NSString *inAppMessageString = [[NSString alloc] initWithData:inAppMessageData encoding:NSUTF8StringEncoding];
-    inAppMessageString = [self escapeStringForJavaScript:inAppMessageString];
-    NSLog(@"In-app message received: %@", inAppMessageString);
+  NSData *inAppMessageData = [message json];
+  NSString *inAppMessageString = [[NSString alloc] initWithData:inAppMessageData encoding:NSUTF8StringEncoding];
+  NSLog(@"In-app message received: %@", inAppMessageString);
 
-    // Send in-app message string back to JavaScript in an `inAppMessageReceived` event
-    NSString* jsStatement = [NSString stringWithFormat:@"app.inAppMessageReceived('%@');", inAppMessageString];
-    [self.commandDelegate evalJs:jsStatement];
-  }
-
-  if (useBrazeUIForInAppMessages) {
-    return BRZInAppMessageUIDisplayChoiceNow;
-  } else {
-    return BRZInAppMessageUIDisplayChoiceDiscard;
-  }
+  // Send in-app message string back to JavaScript in an `inAppMessageReceived` event
+  NSString* jsStatement = [NSString stringWithFormat:@"app.inAppMessageReceived('%@');", inAppMessageString];
+  [self.commandDelegate evalJs:jsStatement];
 }
 
 @end

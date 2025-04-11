@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
-  id="cordova-plugin-braze" version="11.0.0">
+  id="cordova-plugin-braze" version="9.2.0">
   <name>Braze</name>
   <description>Braze Cordova SDK</description>
   <license>MIT</license>
@@ -54,7 +54,8 @@
     </config-file>
     <header-file src="src/ios/BrazePlugin.h" />
     <source-file src="src/ios/BrazePlugin.m" />
-    <source-file src="src/ios/BrazeRuntimeCheck.m" compiler-flags="-DBRZ_SWIFT_VERSION=$(SWIFT_VERSION)" />
+    <header-file src="src/ios/AppDelegate+Braze.h" />
+    <source-file src="src/ios/AppDelegate+Braze.m" />
     <!-- Editing the plist for the location permission prompt -->
     <config-file target="*-Info.plist" parent="NSLocationAlwaysUsageDescription">
       <string>This app is requesting your location to better serve you content.</string>
@@ -64,9 +65,9 @@
         <source url="https://cdn.cocoapods.org/"/>
       </config>
       <pods use-frameworks="true">
-        <pod name="BrazeKit" spec="~> 11.6.1" />
-        <pod name="BrazeUI" spec="~> 11.6.1" />
-        <pod name="BrazeLocation" spec="~> 11.6.1" />
+        <pod name="BrazeKit" spec="~> 9.2.0" />
+        <pod name="BrazeUI" spec="~> 9.2.0" />
+        <pod name="BrazeLocation" spec="~> 9.2.0" />
       </pods>
     </podspec>
   </platform>
