@@ -91,19 +91,7 @@ bool useBrazeUIForInAppMessages;
   self.useUUIDAsDeviceId = settings[@"com.braze.ios_use_uuid_as_device_id"];
   self.forwardUniversalLinks = settings[@"com.braze.ios_forward_universal_links"];
   self.optInWhenPushAuthorized = settings[@"com.braze.should_opt_in_when_push_authorized"];
-
-  isInAppMessageSubscribed = NO;
-
-  [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didFinishLaunchingListener:) name:UIApplicationDidFinishLaunchingNotification object:nil];
-
-  // Set automatic push handling
-  if (![[self sanitizeString:self.disableAutomaticPushHandling] isEqualToString:@"yes"]) {
-    [AppDelegate swizzleHostAppDelegate];
-    NSLog(@"Automatic push handling enabled.");
-  } else {
-    NSLog(@"Automatic push handling disabled.");
-  }
-  
+ 
   self.locationManager = [[CLLocationManager alloc] init];
   self.locationManager.delegate = self;
   
