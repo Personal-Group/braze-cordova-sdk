@@ -715,7 +715,7 @@ open class BrazePlugin : CordovaPlugin() {
     ) {
         when (requestCode) {
             LOCATION_REQUEST_CODE ->
-                    if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    if (grantResults.size > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                         brazelog(I) { "Fine location permission granted." }
                         Braze.getInstance(applicationContext).requestLocationInitialization()
                     } else {
