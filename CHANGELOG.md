@@ -1,5 +1,42 @@
 ⚠️ In version 2.33.0, we changed the iOS bridge from AppboyKit, which is written in Objective-C, to the new [Swift SDK](https://github.com/braze-inc/braze-swift-sdk). If you are upgrading from a version below 2.33.0 to a version above 2.33.0, please read [the instructions](https://github.com/braze-inc/braze-cordova-sdk/blob/master/CHANGELOG.md#2330) to ensure a smooth transition and backward compatibility.
 
+## 14.0.0
+
+##### Breaking
+- Updated the native Android bridge [from Braze Android SDK 37.0.0 to 39.0.0](https://github.com/braze-inc/braze-android-sdk/compare/v37.0.0...v39.0.0#diff-06572a96a58dc510037d5efa622f9bec8519bc1beab13c9f251e97e657a9d4ed).
+  - The minimum required `GradlePluginKotlinVersion` is now `2.1.0`.
+- Updated the native iOS bridge [from Braze Swift SDK 12.0.0 to 13.2.0](https://github.com/braze-inc/braze-swift-sdk/compare/12.0.0...13.2.0#diff-06572a96a58dc510037d5efa622f9bec8519bc1beab13c9f251e97e657a9d4ed).
+  - This includes Xcode 26 support.
+- Removes support for News Feed. The following APIs have been removed:
+  - `launchNewsFeed`
+  - `getNewsFeed`
+  - `getNewsFeedUnreadCount`
+  - `getNewsFeedCardCount`
+  - `getCardCountForCategories`
+  - `getUnreadCardCountForCategories`
+
+## 13.0.0
+
+##### Breaking
+- Updated the internal iOS implementation of `enableSdk` method to use `setEnabled:` instead of `_requestEnableSDKOnNextAppRun`, which was deprecated in the Swift SDK.
+  - Calling this method no longer requires the app to be re-launched to take effect. The SDK will now become enabled as soon as this method is executed.
+- Updated the native Android bridge [from Braze Android SDK 36.0.0 to 37.0.0](https://github.com/braze-inc/braze-android-sdk/compare/v36.0.0...v37.0.0#diff-06572a96a58dc510037d5efa622f9bec8519bc1beab13c9f251e97e657a9d4ed).
+
+## 12.0.0
+
+> [!IMPORTANT]
+> This release reverts the increase to the minimum Android SDK version of the Braze Android SDK from API 21 to API 25 introduced in 34.0.0. This allows the SDK to once again be compiled into apps supporting as early as API 21. However, we are not reintroducing formal support for < API 25. Read more [here](https://github.com/braze-inc/braze-android-sdk/blob/master/CHANGELOG.md#3600).
+
+##### Breaking
+- Updated the native Android bridge [from Braze Android SDK 35.0.0 to 36.0.0](https://github.com/braze-inc/braze-android-sdk/compare/v35.0.0...v36.0.0#diff-06572a96a58dc510037d5efa622f9bec8519bc1beab13c9f251e97e657a9d4ed).
+- Updated the native iOS bridge [from Braze Swift SDK 11.6.1 to 12.0.0](https://github.com/braze-inc/braze-swift-sdk/compare/11.6.1...12.0.0#diff-06572a96a58dc510037d5efa622f9bec8519bc1beab13c9f251e97e657a9d4ed).
+
+##### Fixed
+- Updated the internal iOS implementation of `getUserId` to `braze.user.identifier` instead of `[braze.user idWithCompletion:]`, which was deprecated in Swift SDK [11.5.0](https://github.com/braze-inc/braze-swift-sdk/releases/tag/11.5.0). This deprecation does not have any impact to functionality.
+
+##### Added
+- Added support for the `setSdkAuthenticationSignature` method on Android.
+
 ## 11.0.0
 
 ##### Breaking
@@ -158,7 +195,7 @@
 
 ##### Fixed
 - Updated the native Android version [from Braze Android SDK 26.3.1 to 26.3.2](https://github.com/braze-inc/braze-android-sdk/blob/master/CHANGELOG.md#2632).
-  
+
 ## 6.0.0
 
 ##### Breaking
@@ -195,7 +232,7 @@
 ##### Breaking
 - Renamed instances of `Appboy` to `Braze`.
   - To ensure that your project is properly migrated to the new naming conventions, note and replace the following instances in your project:
-    - The plugin has been renamed from `cordova-plugin-appboy` to `cordova-plugin-braze`. 
+    - The plugin has been renamed from `cordova-plugin-appboy` to `cordova-plugin-braze`.
       - Ensure that you run `cordova plugin remove cordova-plugin-appboy` and then re-add the plugin using the instructions in the [README](./README.md).
     - This GitHub repository has been moved to the URL `https://github.com/braze-inc/braze-cordova-sdk`.
     - In your project's `config.xml` file, rename instances of `com.appboy` to `com.braze` for each of your configuration property keys.
@@ -328,7 +365,7 @@
 
 ##### Breaking
 - Updated to [Braze Android SDK 13.1.2](https://github.com/braze-inc/braze-android-sdk/blob/master/CHANGELOG.md#1312).
-  
+
 ## 2.22.0
 
 ##### Breaking
@@ -445,11 +482,11 @@
 - Added ability to configure geofences in preferences. Note that the geofences branch is still required to use Braze Geofences out of the box.
   - Set `com.appboy.geofences_enabled` to `true/false` on Android.
   - Set `com.appboy.geofences_enabled` to `YES/NO` on iOS.
-  
+
 ## 2.10.1
 
 ##### Fixed
-- Fixed an issue in the iOS plugin where custom endpoints were not correctly getting substituted for the actual server endpoints. 
+- Fixed an issue in the iOS plugin where custom endpoints were not correctly getting substituted for the actual server endpoints.
 
 ## 2.10.0
 
