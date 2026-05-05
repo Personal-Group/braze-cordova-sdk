@@ -29,7 +29,21 @@ ext.postBuildExtras = {
     android {
         kotlinOptions {
             freeCompilerArgs = ['-Xjvm-default=all']
-            jvmTarget = "1.8"
+            jvmTarget = "11"
         }
     }
 }
+
+
+cdvPluginPostBuildExtras.add({
+    configurations.all {
+        resolutionStrategy {
+            force "org.jetbrains.kotlin:kotlin-stdlib:1.9.24"
+            force "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.24"
+            force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.24"
+
+            force "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.6.3"
+            force "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.6.3"
+        }
+    }
+})
